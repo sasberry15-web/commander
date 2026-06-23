@@ -123,12 +123,12 @@
     </div>
 
     <div id="panel-control" class="tab-panel">
-        <div class="section-title"><span>Live Console <span id="net-badge-control" class="net-status-badge net-online">DIRECT ONLINE</span></span><button class="yt-btn" style="width:auto; padding:4px 10px; font-size:11px;" onclick="loadYouTubeBroadcasts()">🔄更新</button></div>
+        <div class="section-title"><span>Live Console <span id="net-badge-control" class="net-status-badge net-online">PC連携 ONLINE</span></span><button class="yt-btn" style="width:auto; padding:4px 10px; font-size:11px;" onclick="loadYouTubeBroadcasts()">🔄更新</button></div>
         <div id="yt-live-control-container">アクティブな配信枠をスキャン中...</div>
     </div>
 
     <div id="panel-stats" class="tab-panel">
-        <div class="section-title"><span>チャンネルアナリティクス（直近28日間） <span id="net-badge-stats" class="net-status-badge net-online">DIRECT ONLINE</span></span></div>
+        <div class="section-title"><span>チャンネルアナリティクス（直近28日間） <span id="net-badge-stats" class="net-status-badge net-online">PC連携 ONLINE</span></span></div>
         <div id="yt-analytics-container">データを取得中...</div>
     </div>
 
@@ -398,7 +398,7 @@
         .then(res => res.json())
         .then(d => {
             if (d.raw_token) { localStorage.setItem("cached_yt_token", d.raw_token); }
-            if(sBadge) { sBadge.innerText = "DIRECT ONLINE"; sBadge.className = "net-status-badge net-online"; }
+            if(sBadge) { sBadge.innerText = "PC連携 ONLINE"; sBadge.className = "net-status-badge net-online"; }
             
             if(!d.success) { container.innerHTML = `<div class="comment-card"><div class="user-text" style="color:#ff4444;">データ取得失敗: ${d.error}</div></div>`; return; }
             
