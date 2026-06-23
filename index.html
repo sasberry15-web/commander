@@ -133,7 +133,7 @@
     </div>
 
     <script>
-    // ⚙️ 【最重要】ここにメインPCの固定IPアドレスを入力してください！
+    // ⚙️ 【設定】ご自身のメインPCの実際のプライベートIPアドレスをここに入力してください
     const MAIN_PC_IP = "192.168.100.1"; 
 
     const PC_DATA_URL = `http://${MAIN_PC_IP}:8000/api/data`;
@@ -190,7 +190,7 @@
         const urlUpcoming = `https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails&broadcastStatus=upcoming&maxResults=5`;
         const headers = { "Authorization": `Bearer ${token}`, "Accept": "application/json" };
         
-        // 🚀 並行して2つのAPIを同時直撃（ラグ完全消失回路）
+        // 🚀 並行行使で同時直撃（ラグ完全消失回路）
         Promise.all([
             fetch(urlActive, { headers }).then(r => r.json()),
             fetch(urlUpcoming, { headers }).then(r => r.json())
@@ -218,7 +218,7 @@
                 const scheduledStartTime = b.snippet.scheduledStartTime || "";
                 const liveChatId = b.snippet.liveChatId || "";
                 
-                // 🕒 新機能：開始予定時間の翻訳
+                // 🕒 追加機能：開始予定時間の翻訳・描画
                 const jstTimeStr = formatToJST(scheduledStartTime);
                 const timeBadgeHtml = jstTimeStr ? `<div class="scheduled-time-zone">${jstTimeStr}</div>` : '';
                 
@@ -272,7 +272,7 @@
         });
     }
 
-    // 🔄 枠の読み込み処理（PCオフライントラップを完全解除）
+    // 🔄 枠の読み込み処理（PCオフライントラップ完全解除版）
     function loadYouTubeBroadcasts() {
         const bBadge = document.getElementById('net-badge-control');
         
@@ -287,8 +287,8 @@
             proceedFetchBroadcasts(localStorage.getItem("cached_yt_token"));
         })
         .catch(() => {
-            // 🚨 【PC全落ち時の身代わり発動】PC通信エラー時はスマホ内のLocalStorageキャッシュを使って即座にGoogleから直撃取得！
-            if(bBadge) { bBadge.innerText = "STANDALONE EMERGENCY (PC全落ち防御稼働中)"; bBadge.className = "net-status-badge net-offline"; }
+            // 🚨 【PC全落ち・セキュリティ遮断の身代わり発動】
+            if(bBadge) { bBadge.innerText = "STANDALONE EMERGENCY (単独直撃稼働中)"; bBadge.className = "net-status-badge net-offline"; }
             proceedFetchBroadcasts(localStorage.getItem("cached_yt_token"));
         });
     }
@@ -454,7 +454,7 @@
                 ${pastHtml || '<div class="user-text">アーカイブデータがありません</div>'}`;
         })
         .catch(() => {
-            if(sBadge) { sBadge.innerText = "OFFLINE (PCが停止しています)"; sBadge.className = "net-status-badge net-offline"; }
+            if(sBadge) { sBadge.innerText = "OFFLINE (PC停止中)"; sBadge.className = "net-status-badge net-offline"; }
             container.innerHTML = `<div class="comment-card"><div class="user-text" style="text-align:center; color:#ff4444;">PCがオフラインのためアナリティクスは表示できません。</div></div>`;
         });
     }
@@ -503,13 +503,11 @@
             renderStats(); 
         })
         .catch(() => {
-            // PCダウン時は監視タブに「PCオフライン」と表示
             document.getElementById('mic-alert').innerText = "🎙️ MIC: PC OFFLINE (接続切れ)";
             document.getElementById('mic-alert').className = "mic-alert-box mute";
         });
     }
     
-    // 初回自動起動
     updateDashboard();
     setInterval(updateDashboard, 2500);
     </script>
