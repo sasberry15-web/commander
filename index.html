@@ -39,7 +39,6 @@
         .mic-alert-box.active { background: rgba(85, 255, 85, 0.02) !important; border-color: rgba(85, 255, 85, 0.25) !important; color: #55ff55 !important; text-shadow: 0 0 6px rgba(85, 255, 85, 0.4) !important; }
         .mic-alert-box.mute { background: rgba(255, 255, 0, 0.04) !important; border-color: rgba(255, 255, 0, 0.6) !important; color: #ffff00 !important; text-shadow: 0 0 8px rgba(255, 255, 0, 0.5) !important; }
         .mic-alert-box.silent { background: rgba(255, 68, 68, 0.06) !important; border-color: #ff4444 !important; color: #ff4444 !important; text-shadow: 0 0 8px rgba(255, 68, 68, 0.5) !important; animation: mic-blink 1s infinite; }
-        @keyframes mic-blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
         
         .toggle-switch-zone { display: flex; align-items: center; justify-content: center; padding: 0 2px; }
         .toggle-button { background: #000000; border: 1px solid rgba(255, 136, 0, 0.15); color: #ffaa44 !important; font-weight: bold !important; text-shadow: 0 0 5px rgba(255, 170, 68, 0.4) !important; font-size: 13px; padding: 12px 10px; border-radius: 6px; cursor: pointer; transition: all 0.8s ease; text-align: center; min-width: 65px; letter-spacing: 1px; }
@@ -83,6 +82,13 @@
         .net-online { background: rgba(85, 255, 85, 0.15); color: #55ff55; border: 1px solid #55ff55; }
         .net-offline { background: rgba(255, 68, 68, 0.15); color: #ff4444; border: 1px solid #ff4444; }
         .scheduled-time-zone { font-size: 12px; color: #00ffff; font-family: 'Courier New', monospace; font-weight: bold; margin-bottom: 10px; background: rgba(0,255,255,0.04); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(0,255,255,0.15); display: inline-block; }
+
+        /* OBS Scene Styles */
+        .obs-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px; }
+        .obs-btn-card { background: #000; border: 1px solid rgba(255,170,68,0.25); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+        .obs-input { background: #111; border: 1px solid rgba(255,170,68,0.15); color: #fff; font-size: 11px; padding: 4px; border-radius: 4px; width: 100%; text-align: center; -webkit-user-select: text; user-select: text; }
+        .obs-go-btn { background: rgba(255, 170, 68, 0.08); border: 1px solid #ffaa44; color: #ffaa44; padding: 6px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; text-align: center; }
+        .obs-go-btn:active { background: rgba(255, 170, 68, 0.2); }
     </style>
 </head>
 <body>
@@ -123,23 +129,43 @@
     </div>
 
     <div id="panel-control" class="tab-panel">
-        <div class="section-title"><span>Live Console <span id="net-badge-control" class="net-status-badge net-online">PC連携 ONLINE</span></span><button class="yt-btn" style="width:auto; padding:4px 10px; font-size:11px;" onclick="loadYouTubeBroadcasts()">🔄更新</button></div>
+        <div class="section-title"><span>OBSシーン切り替えコントロール</span></div>
+        <div class="obs-grid">
+            <div class="obs-btn-card">
+                <input type="text" class="obs-input" id="obs-s1-name" value="配信準備" onchange="saveSceneNames()">
+                <div class="obs-go-btn" onclick="triggerSceneSwitch('obs-s1-name')">🔁 転換</div>
+            </div>
+            <div class="obs-btn-card">
+                <input type="text" class="obs-input" id="obs-s2-name" value="ゲーム画面" onchange="saveSceneNames()">
+                <div class="obs-go-btn" onclick="triggerSceneSwitch('obs-s2-name')">🔁 転換</div>
+            </div>
+            <div class="obs-btn-card">
+                <input type="text" class="obs-input" id="obs-s3-name" value="雑談画面" onchange="saveSceneNames()">
+                <div class="obs-go-btn" onclick="triggerSceneSwitch('obs-s3-name')">🔁 転換</div>
+            </div>
+            <div class="obs-btn-card">
+                <input type="text" class="obs-input" id="obs-s4-name" value="配信終了" onchange="saveSceneNames()">
+                <div class="obs-go-btn" onclick="triggerSceneSwitch('obs-s4-name')">🔁 転換</div>
+            </div>
+        </div>
+
+        <div class="section-title"><span>Google Cloud ダイレクト接続盤 <span id="net-badge-control" class="net-status-badge net-online">DIRECT ONLINE</span></span><button class="yt-btn" style="width:auto; padding:4px 10px; font-size:11px;" onclick="loadYouTubeBroadcasts()">🔄 枠更新</button></div>
         <div id="yt-live-control-container">アクティブな配信枠をスキャン中...</div>
     </div>
 
     <div id="panel-stats" class="tab-panel">
-        <div class="section-title"><span>アナリティクス（直近28日間） <span id="net-badge-stats" class="net-status-badge net-online">PC連携 ONLINE</span></span></div>
-        <div id="yt-analytics-container">データを取得中...</div>
+        <div class="section-title"><span>チャンネルアナリティクス（直近28日間） <span id="net-badge-stats" class="net-status-badge net-online">DIRECT ONLINE</span></span></div>
+        <div id="yt-analytics-container">YouTube API サーバーから神データをハント中...</div>
     </div>
 
     <script>
-    // ⚙️ 【設定】ご自身のメインPCの実際のプライベートIPアドレスをここに入力してください
     const MAIN_PC_IP = "192.168.10.103"; 
 
     const PC_DATA_URL = `http://${MAIN_PC_IP}:8000/api/data`;
     const PC_TOKEN_URL = `http://${MAIN_PC_IP}:8000/api/youtube-token`;
     const PC_STATS_URL = `http://${MAIN_PC_IP}:8000/api/youtube-stats`;
     const PC_MIC_URL = `http://${MAIN_PC_IP}:8000/api/toggle-mic`;
+    const PC_SCENE_URL = `http://${MAIN_PC_IP}:8000/api/obs-scene`;
 
     let currentPC = 'main'; let cachedData = null; let toggleTimeout = null; let activeTab = 'status';
 
@@ -157,11 +183,35 @@
         document.getElementById(`tab-btn-${tabName}`).classList.add('active-tab');
         document.getElementById(`panel-${tabName}`).classList.add('active-panel');
         triggerToggleLit(); def_wakeUpPhoneShield();
-        if (tabName === 'control') { loadYouTubeBroadcasts(); }
+        if (tabName === 'control') { loadYouTubeBroadcasts(); loadSavedSceneNames(); }
         if (tabName === 'stats') { loadChannelAnalytics(); }
     }
 
-    // 🕒 ISO8601時間のフォーマットを日本時間に美しく翻訳する関数
+    // 🕒 シーン名のLocalStorage保存・読み込み
+    function saveSceneNames() {
+        localStorage.setItem("obs_s1", document.getElementById('obs-s1-name').value);
+        localStorage.setItem("obs_s2", document.getElementById('obs-s2-name').value);
+        localStorage.setItem("obs_s3", document.getElementById('obs-s3-name').value);
+        localStorage.setItem("obs_s4", document.getElementById('obs-s4-name').value);
+    }
+    function loadSavedSceneNames() {
+        if(localStorage.getItem("obs_s1")) document.getElementById('obs-s1-name').value = localStorage.getItem("obs_s1");
+        if(localStorage.getItem("obs_s2")) document.getElementById('obs-s2-name').value = localStorage.getItem("obs_s2");
+        if(localStorage.getItem("obs_s3")) document.getElementById('obs-s3-name').value = localStorage.getItem("obs_s3");
+        if(localStorage.getItem("obs_s4")) document.getElementById('obs-s4-name').value = localStorage.getItem("obs_s4");
+    }
+
+    // 🔁 OBSシーン切り替え発射関数
+    function triggerSceneSwitch(inputId) {
+        const name = document.getElementById(inputId).value.trim();
+        if(!name) return;
+        fetch(PC_SCENE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sceneName: name })
+        }).catch(() => { alert("PCへの接続に失敗しました。PCが起動しているか確認してください。"); });
+    }
+
     function formatToJST(isoString) {
         if (!isoString || isoString === "undefined" || isoString === "") return null;
         try {
@@ -176,13 +226,10 @@
         } catch { return null; }
     }
 
-    // 👑 【爆速並行連撃】スマホから直接Google Cloudを叩いて一瞬で枠データを取得する
     function proceedFetchBroadcasts(token) {
         const controlContainer = document.getElementById('yt-live-control-container');
-        const bBadge = document.getElementById('net-badge-control');
-        
         if(!token) {
-            controlContainer.innerHTML = '<div class="comment-card"><div class="user-text" style="color:#ff4444; text-align:center;">エラー: スマホ内のセキュア領域(LocalStorage)に通行証がありません。PC起動時に一度読み込ませてください。</div></div>';
+            controlContainer.innerHTML = '<div class="comment-card"><div class="user-text" style="color:#ff4444; text-align:center;">エラー: 通行証(token)がLocalStorageにありません。</div></div>';
             return;
         }
         
@@ -190,7 +237,6 @@
         const urlUpcoming = `https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails&broadcastStatus=upcoming&maxResults=5`;
         const headers = { "Authorization": `Bearer ${token}`, "Accept": "application/json" };
         
-        // 🚀 並行行使で同時直撃（ラグ完全消失回路）
         Promise.all([
             fetch(urlActive, { headers }).then(r => r.json()),
             fetch(urlUpcoming, { headers }).then(r => r.json())
@@ -217,17 +263,13 @@
                 const currentDvr = b.contentDetails ? b.contentDetails.enableDvr : true;
                 const scheduledStartTime = b.snippet.scheduledStartTime || "";
                 const liveChatId = b.snippet.liveChatId || "";
-                
-                // 🕒 追加機能：開始予定時間の翻訳・描画
                 const jstTimeStr = formatToJST(scheduledStartTime);
                 const timeBadgeHtml = jstTimeStr ? `<div class="scheduled-time-zone">${jstTimeStr}</div>` : '';
                 
                 liveHtml += `
                 <div class="yt-broadcast-card">
                     <span class="yt-tag ${isVertical?'vertical':'horizontal'}">${isVertical?'📱 縦配信枠':'🖥️ 横配信枠'}:${status.toUpperCase()}</span>
-                    
                     ${timeBadgeHtml}
-                    
                     <label class="yt-label">タイトル全文編集</label>
                     <textarea class="yt-textarea" id="title-${b.id}" rows="2">${title}</textarea>
                     <div class="dvr-row">
@@ -272,11 +314,8 @@
         });
     }
 
-    // 🔄 枠の読み込み処理（PCオフライントラップ完全解除版）
     function loadYouTubeBroadcasts() {
         const bBadge = document.getElementById('net-badge-control');
-        
-        // ① まず通常通りPCから最新の鍵を取りに行く
         fetch(PC_TOKEN_URL)
         .then(res => res.json())
         .then(tData => {
@@ -287,8 +326,7 @@
             proceedFetchBroadcasts(localStorage.getItem("cached_yt_token"));
         })
         .catch(() => {
-            // 🚨 【PC全落ち・セキュリティ遮断の身代わり発動】
-            if(bBadge) { bBadge.innerText = "単独稼働中"; bBadge.className = "net-status-badge net-offline"; }
+            if(bBadge) { bBadge.innerText = "単独直撃 EMERGENCY"; bBadge.className = "net-status-badge net-offline"; }
             proceedFetchBroadcasts(localStorage.getItem("cached_yt_token"));
         });
     }
@@ -299,22 +337,16 @@
         const dvrVal = document.getElementById(`dvr-${broadcastId}`).value;
         const originalText = targetBtn.innerText;
         
-        targetBtn.innerText = "⏳ YouTubeへ書き込み中..."; targetBtn.style.borderColor = "#ff4444"; targetBtn.style.color = "#ff4444"; def_wakeUpPhoneShield();
+        targetBtn.innerText = "⏳ Google Cloudへ反映中..."; targetBtn.style.borderColor = "#ff4444"; targetBtn.style.color = "#ff4444"; def_wakeUpPhoneShield();
         
         const token = localStorage.getItem("cached_yt_token");
-        if(!token) { alert("アクセストークンがありません。枠を一度更新してください。"); targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44"; return; }
+        if(!token) { alert("アクセストークンがありません。"); targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44"; return; }
         
         let partStr = "snippet,status";
-        let bodyObj = {
-            id: broadcastId,
-            snippet: { title: titleVal },
-            status: { privacyStatus: privacyVal }
-        };
-
+        let bodyObj = { id: broadcastId, snippet: { title: titleVal }, status: { privacyStatus: privacyVal } };
         if (scheduledStartTime && scheduledStartTime !== "" && scheduledStartTime !== "undefined") {
             bodyObj.snippet.scheduledStartTime = scheduledStartTime;
         }
-
         if (status === "live") {
             partStr += ",contentDetails";
             bodyObj.contentDetails = { enableDvr: (dvrVal === "true") };
@@ -322,32 +354,26 @@
         
         fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts?part=${partStr}`, {
             method: 'PUT',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(bodyObj)
         })
         .then(res => {
             if(res.ok) {
-                targetBtn.innerText = "✅ 反映が完了しました！"; targetBtn.style.borderColor = "#55ff55"; targetBtn.style.color = "#55ff55";
+                targetBtn.innerText = "✅ 反映完了しました！"; targetBtn.style.borderColor = "#55ff55"; targetBtn.style.color = "#55ff55";
                 setTimeout(() => { targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44"; targetBtn.style.color = "#ffaa44"; loadYouTubeBroadcasts(); }, 1500);
             } else {
                 return res.json().then(err => {
-                    alert("Google拒絶エラー: " + (err.error ? err.error.message : "反映に失敗しました。"));
-                    targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44"; targetBtn.style.color = "#ffaa44";
+                    alert("Google拒絶エラー: " + (err.error ? err.error.message : "反映失敗。"));
+                    targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44";
                 });
             }
-        })
-        .catch(err => {
-            alert("ダイレクト通信失敗: " + err);
-            targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44";
-        });
+        }).catch(err => { alert("通信失敗: " + err); targetBtn.innerText = originalText; });
     }
 
+    // 💥 【核心修正】チャット投稿エラーの生データを可視化する回路
     function sendEmergencyChat(broadcastId, chatId, btn) {
         const txtInput = document.getElementById(`chatmsg-${broadcastId}`); const msg = txtInput.value.trim();
-        if(!msg || !chatId || chatId === "null") { alert("メッセージが空、あるいはチャットIDがありません。"); return; }
+        if(!msg || !chatId || chatId === "null" || chatId === "") { alert("エラー: 有効なチャットIDが見つかりません。(※枠が配信中(LIVE)でないと投稿できない場合があります)"); return; }
         const orig = btn.innerText; btn.innerText = ".."; btn.disabled = true;
         
         const token = localStorage.getItem("cached_yt_token");
@@ -367,15 +393,20 @@
         .then(res => {
             btn.innerText = orig; btn.disabled = false;
             if(res.ok) { txtInput.value = ''; alert("🚀 スマホからチャット投稿しました！"); }
-            else { alert("Google側でチャット送信が弾かれました。"); }
+            else { 
+                // 🔍 Googleからのリアルな怒りの理由をポップアップ表示
+                return res.json().then(errData => {
+                    const errMsg = errData.error ? errData.error.message : "不明な制限エラー";
+                    alert(`❌ Google拒絶エラー詳細:\n${errMsg}`);
+                });
+            }
         })
-        .catch(() => { alert("通信エラー"); btn.innerText = orig; btn.disabled = false; });
+        .catch(err => { alert("通信エラー: " + err); btn.innerText = orig; btn.disabled = false; });
     }
 
     function forceEndBroadcast(broadcastId, btn) {
         if(!confirm("⚠️⚠️⚠️【超重大警告】⚠️⚠️⚠️\n本当に配信を強制終了してもよろしいですか？\nこの操作は絶対に取り消せません。")) return;
-        const orig = btn.innerText; btn.innerText = "⏳ 配信完全シャットダウン中..."; btn.disabled = true;
-        
+        const orig = btn.innerText; btn.innerText = "⏳ 配信終了中..."; btn.disabled = true;
         const token = localStorage.getItem("cached_yt_token");
         if(!token) { alert("通行証がありません。"); btn.disabled = false; btn.innerText = orig; return; }
         
@@ -385,9 +416,8 @@
         .then(res => {
             btn.disabled = false; btn.innerText = orig;
             if(res.ok) { alert("ライブストリームを終了させました。"); loadYouTubeBroadcasts(); }
-            else { alert("YouTubeへの強制終了命令が拒絶されました。"); }
-        })
-        .catch(() => { alert("通信エラー"); btn.disabled = false; btn.innerText = orig; });
+            else { alert("強制終了命令が拒絶されました。"); }
+        }).catch(() => { btn.disabled = false; btn.innerText = orig; });
     }
 
     function loadChannelAnalytics() {
@@ -399,7 +429,6 @@
         .then(d => {
             if (d.raw_token) { localStorage.setItem("cached_yt_token", d.raw_token); }
             if(sBadge) { sBadge.innerText = "PC連携 ONLINE"; sBadge.className = "net-status-badge net-online"; }
-            
             if(!d.success) { container.innerHTML = `<div class="comment-card"><div class="user-text" style="color:#ff4444;">データ取得失敗: ${d.error}</div></div>`; return; }
             
             let warningHtml = '';
@@ -445,17 +474,12 @@
                         <div class="an-val" style="color:#fff;">${d.an_28d_views.toLocaleString()}回</div>
                     </div>
                 </div>
-                <div class="analytics-grid" style="margin-bottom:20px; border-top:1px solid rgba(255,170,68,0.1); padding-top:15px;">
-                    <div class="an-card" style="border:none;"><div class="an-label">現在の登録者数</div><div class="an-val" style="font-size:16px;">${parseInt(d.subscribers).toLocaleString()}人</div></div>
-                    <div class="an-card" style="border:none;"><div class="an-label">累計再生回数</div><div class="an-val" style="font-size:16px;">${parseInt(d.total_views).toLocaleString()}回</div></div>
-                    <div class="an-card" style="border:none;"><div class="an-label">総公開動画数</div><div class="an-val" style="font-size:16px;">${parseInt(d.total_videos).toLocaleString()}本</div></div>
-                </div>
-                <div class="section-title"><span>直近ライブ配信</span></div>
+                <div class="section-title"><span>直近アーカイブ通知表</span></div>
                 ${pastHtml || '<div class="user-text">アーカイブデータがありません</div>'}`;
         })
         .catch(() => {
             if(sBadge) { sBadge.innerText = "OFFLINE (PC停止中)"; sBadge.className = "net-status-badge net-offline"; }
-            container.innerHTML = `<div class="comment-card"><div class="user-text" style="text-align:center; color:#ff4444;">PCがオフラインのためアナリティクスは表示できません。</div></div>`;
+            container.innerHTML = `<div class="comment-card"><div class="user-text" style="text-align:center; color:#ff4444;">PCオフラインのため取得できません。</div></div>`;
         });
     }
 
@@ -464,18 +488,32 @@
         def_wakeUpPhoneShield();
         fetch(PC_MIC_URL, { method: 'POST' }).then(() => { setTimeout(updateDashboard, 100); });
     }
-    
     function triggerToggleLit() {
         const btn = document.getElementById('pc-toggle-btn'); btn.classList.add('lit');
         if (toggleTimeout) clearTimeout(toggleTimeout); toggleTimeout = setTimeout(() => btn.classList.remove('lit'), 5000);
     }
-    
     function togglePC() { if (currentPC === 'main') { switchPC('sub'); } else { switchPC('main'); } }
     function switchPC(target) {
         currentPC = target; const btn = document.getElementById('pc-toggle-btn');
         if (target === 'main') { btn.innerText = 'MAIN'; document.getElementById('ffmpeg-panel').style.display = 'none'; }
         else { btn.innerText = 'SUB'; document.getElementById('ffmpeg-panel').style.display = 'block'; }
         triggerToggleLit(); renderStats();
+    }
+
+    // 🔄 JSONデータ構造からコメントカード群を動的ビルドする超軽量ロジック
+    function buildCommentListHtml(comments) {
+        if(!comments || comments.length === 0) return '<div class="comment-card"><div class="user-text">コメントを待機中...</div></div>';
+        return comments.map(c => {
+            let badgeHtml = "";
+            if (c.isMod) badgeHtml += ' <span style="color: #55ff55; font-size: 10px; border: 1px solid #55ff55; padding: 1px 4px; border-radius: 3px; margin-left: 6px; font-weight: bold;">MOD</span>';
+            if (c.isMem) badgeHtml += ' <span style="color: #00ffff; font-size: 10px; border: 1px solid #00ffff; padding: 1px 4px; border-radius: 3px; margin-left: 6px; font-weight: bold;">MEM</span>';
+            let cardStyle = "", priceHtml = "";
+            if (c.price) {
+                cardStyle = 'style="border-left: 4px solid #ff3366 !important; background: rgba(255, 51, 102, 0.07) !important;"';
+                priceHtml = `<span style="color: #ff3366; font-weight: bold; margin-left: 8px; background: rgba(255, 51, 102, 0.2); padding: 2px 6px; border-radius: 4px; font-size: 0.9em;">${c.price}</span>`;
+            }
+            return `<div class="comment-card" ${cardStyle}><div class="user-name" style="font-size:20px; font-weight:normal;">${c.name}${badgeHtml}${priceHtml}</div><div class="user-text" style="font-size:28px; font-weight:bold;">${c.text}</div></div>`;
+        }).join("\n");
     }
 
     function renderStats() {
@@ -492,17 +530,12 @@
             let br = cachedData.bitrate; if (br) { br = br.replace(new RegExp('kbits/s|kb/s|kbps|b/s', 'gi'), '').trim(); } document.getElementById('ff-bitrate').innerText = br ? br : '--';
             document.getElementById('ff-total-pct').innerText = cachedData.sub_total_progress; let pctValue = parseFloat(cachedData.sub_total_progress) || 0; document.getElementById('ff-progress-bar').style.width = pctValue + '%';
         }
-        document.getElementById('viewers-val').innerText = '👀 ' + cachedData.viewers; document.getElementById('likes-val').innerText = '👍 ' + cachedData.likes; document.getElementById('comment-list-container').innerHTML = cachedData.comment_list;
+        document.getElementById('viewers-val').innerText = '👀 ' + cachedData.viewers; document.getElementById('likes-val').innerText = '👍 ' + cachedData.likes; 
+        document.getElementById('comment-list-container').innerHTML = buildCommentListHtml(cachedData.comments_json);
     }
 
     function updateDashboard() {
-        fetch(PC_DATA_URL)
-        .then(response => response.json())
-        .then(data => { 
-            cachedData = data; 
-            renderStats(); 
-        })
-        .catch(() => {
+        fetch(PC_DATA_URL).then(response => response.json()).then(data => { cachedData = data; renderStats(); }).catch(() => {
             document.getElementById('mic-alert').innerText = "🎙️ MIC: PC OFFLINE (接続切れ)";
             document.getElementById('mic-alert').className = "mic-alert-box mute";
         });
