@@ -282,7 +282,7 @@
         .then(tData => {
             if(tData.token) { 
                 localStorage.setItem("cached_yt_token", tData.token); 
-                if(bBadge) { bBadge.innerText = "DIRECT ONLINE (PC連携済)"; bBadge.className = "net-status-badge net-online"; }
+                if(bBadge) { bBadge.innerText = "PC連携 ONLINE"; bBadge.className = "net-status-badge net-online"; }
             }
             proceedFetchBroadcasts(localStorage.getItem("cached_yt_token"));
         })
