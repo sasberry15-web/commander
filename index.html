@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Stream Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #000000;
+            color: #ffaa44;
+            font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Hiragino Kaku Gothic ProN', sans-serif;
+            padding: 10px 15px 15px 15px;
+            overflow-x: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+            font-size: 110% !important;
+        }
+        .dashboard-nav { display: flex; gap: 8px; margin-bottom: 15px; border-bottom: 1px solid rgba(255, 170, 68, 0.15); padding-bottom: 8px; }
+        .nav-tab { flex: 1; background: #000000; border: 1px solid rgba(255, 136, 0, 0.12); color: rgba(255, 170, 68, 0.35); padding: 10px 4px; text-align: center; font-size: 13px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; white-space: nowrap; }
+        .nav-tab.active-tab { color: #ffaa44 !important; border-color: #ffaa44 !important; background: rgba(255, 136, 0, 0.04); text-shadow: 0 0 6px rgba(255, 170, 68, 0.5); }
+        .tab-panel { display: none; }
+        .tab-panel.active-panel { display: block; }
+        
+        .stats-container { display: flex; align-items: stretch; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+        .stat-card { flex: 1; background: #000000; border: 1px solid rgba(255, 136, 0, 0.15); border-radius: 6px; padding: 8px 10px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+        .stat-inline-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .stat-side-label { font-size: 13px; font-weight: bold; color: rgba(255, 170, 68, 0.35); letter-spacing: 1px; }
+        .stat-value { font-size: 32px; font-weight: bold; font-family: 'Courier New', Courier, monospace; text-shadow: 0 0 8px rgba(255, 170, 68, 0.4); }
+        .stat-bar { height: 3px; background: rgba(255, 170, 68, 0.05); margin-top: 4px; border-radius: 2px; overflow: hidden; }
+        .stat-fill { height: 100%; background: #ffaa44; box-shadow: 0 0 6px #ffaa44; transition: width 0.4s ease; }
+        .stat-sub-row { display: flex; justify-content: space-between; margin-top: 6px; font-size: 13px; font-family: 'Courier New', Courier, monospace; color: rgba(255, 170, 68, 0.7); padding: 0 2px; }
+        .mem-zone { display: flex; align-items: center; }
+        .mem-label { font-size: 10px; color: rgba(255, 170, 68, 0.35); font-weight: bold; margin-right: 4px; letter-spacing: 0.5px; }
+        
+        .mic-alert-box { background: rgba(255, 136, 0, 0.01); border: 1px solid rgba(255, 136, 0, 0.1); color: #ffaa44; padding: 14px; text-align: center; font-size: 14px; font-weight: bold; border-radius: 6px; margin-bottom: 18px; letter-spacing: 1px; transition: all 0.2s ease; text-shadow: 0 0 4px rgba(255, 136, 0, 0.2); cursor: pointer; }
+        .mic-alert-box.active { background: rgba(85, 255, 85, 0.02) !important; border-color: rgba(85, 255, 85, 0.25) !important; color: #55ff55 !important; text-shadow: 0 0 6px rgba(85, 255, 85, 0.4) !important; }
+        .mic-alert-box.mute { background: rgba(255, 255, 0, 0.04) !important; border-color: rgba(255, 255, 0, 0.6) !important; color: #ffff00 !important; text-shadow: 0 0 8px rgba(255, 255, 0, 0.5) !important; }
+        .mic-alert-box.silent { background: rgba(255, 68, 68, 0.06) !important; border-color: #ff4444 !important; color: #ff4444 !important; text-shadow: 0 0 8px rgba(255, 68, 68, 0.5) !important; animation: mic-blink 1s infinite; }
+        @keyframes mic-blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        
+        .toggle-switch-zone { display: flex; align-items: center; justify-content: center; padding: 0 2px; }
+        .toggle-button { background: #000000; border: 1px solid rgba(255, 136, 0, 0.15); color: #ffaa44 !important; font-weight: bold !important; text-shadow: 0 0 5px rgba(255, 170, 68, 0.4) !important; font-size: 13px; padding: 12px 10px; border-radius: 6px; cursor: pointer; transition: all 0.8s ease; text-align: center; min-width: 65px; letter-spacing: 1px; }
+        .toggle-button.lit { background: rgba(255, 136, 0, 0.03) !important; border-color: #ffaa44 !important; box-shadow: 0 0 10px rgba(255, 136, 0, 0.15) !important; transition: all 0.1s ease !important; }
+        .ffmpeg-panel { display: none; background: #000000; border: 1px solid rgba(255, 136, 0, 0.15); border-radius: 6px; padding: 12px; margin-bottom: 18px; }
+        .ffmpeg-header { font-size: 11px; letter-spacing: 1px; color: rgba(255, 170, 68, 0.4); margin-bottom: 8px; border-bottom: 1px solid rgba(255, 170, 68, 0.1); padding-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .ffmpeg-file { font-size: 13px; font-family: 'Courier New', Courier, monospace; color: #bbb; margin-bottom: 10px; word-break: break-all; }
+        .ffmpeg-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 12px; font-family: 'Courier New', Courier, monospace; font-size: 13px; color: rgba(255, 170, 68, 0.8); }
+        .ffmpeg-grid span { color: #fff; font-weight: bold; }
+        .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: rgba(255, 170, 68, 0.4); margin-bottom: 12px; padding-left: 4px; border-left: 2px solid #ffaa44; display: flex; justify-content: space-between; align-items: center; }
+        .live-status { font-family: 'Courier New', Courier, monospace; font-size: 12px; font-weight: bold; display: flex; gap: 12px; }
+        .status-item { background: rgba(255, 170, 68, 0.01); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255, 170, 68, 0.05); }
+        .comment-list { display: flex; flex-direction: column; gap: 12px; }
+        .comment-card { background: #000000; border: 1px solid rgba(255, 170, 68, 0.04); border-left: 2px solid rgba(255, 170, 68, 0.2); border-radius: 4px; padding: 12px; transition: all 0.3s ease; }
+        .user-name { margin-bottom: 6px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; color: rgba(255, 170, 68, 0.4); }
+        .user-text { color: #ffcc88; line-height: 1.4; word-break: break-all; }
+
+        .yt-broadcast-card { background: #000000; border: 1px solid rgba(255, 136, 0, 0.25); border-radius: 8px; padding: 15px; margin-bottom: 18px; }
+        .yt-tag { display: inline-block; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-bottom: 10px; letter-spacing: 1px; text-transform: uppercase; }
+        .yt-tag.horizontal { background: rgba(0, 170, 255, 0.15); color: #00aaff; border: 1px solid rgba(0, 170, 255, 0.3); }
+        .yt-tag.vertical { background: rgba(255, 0, 136, 0.15); color: #ff0088; border: 1px solid rgba(255, 0, 136, 0.3); }
+        .yt-label { font-size: 11px; color: rgba(255, 170, 68, 0.4); font-weight: bold; margin-bottom: 5px; display: block; letter-spacing: 1px; }
+        .yt-textarea { width: 100%; background: #000000; border: 1px solid rgba(255, 170, 68, 0.25); border-radius: 6px; color: #fff; font-size: 15px; padding: 10px; font-family: inherit; resize: none; margin-bottom: 12px; -webkit-user-select: text; user-select: text; }
+        .yt-textarea:focus { border-color: #ffaa44; outline: none; }
+        .yt-select { background: #000000; border: 1px solid rgba(255, 170, 68, 0.25); border-radius: 6px; color: #ffaa44; font-size: 15px; padding: 10px; font-weight: bold; outline: none; }
+        .dvr-select { width: 50% !important; margin-bottom: 0 !important; padding: 6px !important; }
+        .yt-btn { width: 100%; background: rgba(255, 136, 0, 0.05); border: 1px solid #ffaa44; color: #ffaa44; font-size: 14px; font-weight: bold; padding: 12px; border-radius: 6px; cursor: pointer; letter-spacing: 1px; transition: all 0.2s ease; text-shadow: 0 0 4px rgba(255, 170, 68, 0.3); }
+        .yt-btn:active { transform: scale(0.98); background: rgba(255, 136, 0, 0.15); }
+        
+        .chat-input-zone { display: flex; gap: 8px; margin-bottom: 12px; }
+        .chat-txt { flex: 1; background: #000; border: 1px solid rgba(255,170,68,0.3); border-radius: 6px; color: #fff; padding: 10px; font-size: 14px; -webkit-user-select: text; user-select: text; }
+        .chat-send-btn { background: #ffaa44; color: #000; border: none; padding: 0 16px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 13px; }
+        .danger-zone { border: 1px solid #ff4444 !important; background: rgba(255,68,68,0.02) !important; padding: 12px; border-radius: 6px; margin-top: 20px; }
+        .dvr-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; background: rgba(255,255,255,0.01); padding: 8px; border-radius: 6px; border: 1px solid rgba(255,170,68,0.1); }
+        .analytics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 15px; }
+        .an-card { background: #000; border: 1px solid rgba(255,170,68,0.15); border-radius: 6px; padding: 10px 4px; text-align: center; }
+        .an-label { font-size: 11px; color: rgba(255,170,68,0.4); margin-bottom: 4px; }
+        .an-val { font-size: 20px; font-weight: bold; font-family: 'Courier New', monospace; color: #ffaa44; }
+        
+        .net-status-badge { font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; margin-left: 8px; }
+        .net-online { background: rgba(85, 255, 85, 0.15); color: #55ff55; border: 1px solid #55ff55; }
+        .net-offline { background: rgba(255, 68, 68, 0.15); color: #ff4444; border: 1px solid #ff4444; }
+        .scheduled-time-zone { font-size: 12px; color: #00ffff; font-family: 'Courier New', monospace; font-weight: bold; margin-bottom: 10px; background: rgba(0,255,255,0.04); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(0,255,255,0.15); display: inline-block; }
+    </style>
+</head>
+<body>
+
+    <video id="no-sleep-video" loop playsinline muted autoplay style="position:fixed; top:0; left:0; width:1px; height:1px; opacity:0.01; pointer-events:none; z-index:-1000;">
+        <source src="data:video/mp4;base64,AAAAIGZ0eXBtcDQyAAAAAG1wNDJpc29tYXZjMQBtcDQyAAAAH21vb3YAAABsbXZoZAAAAABfS8pYX0vKWAAB9AAAAdwAAQAAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAACAdHJhawAAXHRraGQAAAADX0vKWF9LylgAAAABAAAAAAAB3AAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAABtZWRpYQAAACBtZGhkAAAAAF9LylhfS8pYAAH0AAAAdwBVY2gAAAAAACloZGxyAAAAAAAAAAB2aWRlbwAAAAAAAAAAAAAAAFZpZGVvTWVkaWEAAAAAVW1pbmYAAAAUdm1oZAAAAAAAQAAAQQAAAAgAc3RibAAAAGZzdHNkAAAAAAAAAAEAAABWYXZjMQAAAAAAAAAAAAAAAAAAAAgACABIAAAASAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGP//AAAARWF2Y0MBbYAKbP/hABhnY0AKbEAhsBAgAAMAAgAAAwB9AAfJgAEABW1kYXQAAAAYR2WeAAMwGQYExv//739fS8pYX0vKWAAAABhkaW5mAAAAEGRyZWYAAAAAAAAAAQAAAAxtdXJsAAAAAQAAAEZzdHRzAAAAAAAAAAEAAAABAAABAAAAAABzdHNjAAAAAAAAAAEAAAABAAAAAQAAAAEAAAAAc3RzeiAAAAAAAAAAAAAAAQAAABgAAAAAc3RjbwAAAAAAAAABAAAAMAAAADdidWRhAAAAKm1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXIAAAAAAAAAAAAAAAAAAAAAAAAAY2lsc3QAAAA=" type="video/mp4">
+    </video>
+
+    <div class="dashboard-nav">
+        <div class="nav-tab active-tab" id="tab-btn-status" onclick="switchTab('status')">📊 配信監視</div>
+        <div class="nav-tab" id="tab-btn-control" onclick="switchTab('control')">🎙️ ライブ操作</div>
+        <div class="nav-tab" id="tab-btn-stats" onclick="switchTab('stats')">📈 チャンネル</div>
+    </div>
+
+    <div id="panel-status" class="tab-panel active-panel">
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-inline-row"><span class="stat-side-label">CPU</span><span class="stat-value" id="cpu-val">--%</span></div>
+                <div class="stat-bar"><div class="stat-fill" id="cpu-bar" style="width: 0%;"></div></div>
+                <div class="stat-sub-row"><span id="cpu-temp-val">--°C</span><div class="mem-zone"><span class="mem-label">RAM</span><span id="sys-ram-val">--GB</span></div></div>
+            </div>
+            <div class="toggle-switch-zone"><div class="toggle-button" id="pc-toggle-btn" onclick="togglePC()">MAIN</div></div>
+            <div class="stat-card">
+                <div class="stat-inline-row"><span class="stat-side-label">GPU</span><span class="stat-value" id="gpu-val">--%</span></div>
+                <div class="stat-bar"><div class="stat-fill" id="gpu-bar" style="width: 0%;"></div></div>
+                <div class="stat-sub-row"><span id="cpu-power-val">--W</span><div class="mem-zone"><span class="mem-label">VRAM</span><span id="gpu-vram-val">--GB</span></div></div>
+            </div>
+        </div>
+        <div class="mic-alert-box" id="mic-alert" onclick="toggleMicMute()">🎙️ MIC: 接続待機中...</div>
+        <div class="ffmpeg-panel" id="ffmpeg-panel">
+            <div class="ffmpeg-header"><span>🎬 全体進捗 <span id="ff-total-pct" style="margin-left: 8px; background: rgba(255,136,0,0.1); padding: 2px 8px; border-radius: 4px; color: #ffaa44; font-weight: bold; border: 1px solid rgba(255,136,0,0.2);">--</span></span><span id="ff-status" style="color: #ffaa44; font-weight: bold;">待機中</span></div>
+            <div class="ffmpeg-file">ファイル: <span id="ff-filename">--</span></div>
+            <div class="stat-bar" style="height: 4px; background: rgba(255, 170, 68, 0.02); margin-bottom: 12px; border-radius: 2px; overflow: hidden;"><div class="stat-fill" id="ff-progress-bar" style="width: 0%; height: 100%; background: #ffaa44; box-shadow: 0 0 6px #ffaa44; transition: width 0.4s ease;"></div></div>
+            <div class="ffmpeg-grid"><div>進捗: <span id="ff-time">--:--:--</span></div><div>速度: <span id="ff-speed">--x</span></div><div>ビットレート: <span id="ff-bitrate">--</span></div><div>経過: <span id="ff-elapsed">--:--:--</span></div></div>
+        </div>
+        <div class="section-title"><span>コメント配信状況</span><div class="live-status"><span class="status-item" id="viewers-val" style="color: #ffaa44; text-shadow: 0 0 6px rgba(255,170,68,0.4);">👀 --</span><span class="status-item" id="likes-val" style="color: #ff44aa; border-color: rgba(255,68,170,0.08); text-shadow: 0 0 6px rgba(255,68,170,0.4);">👍 --</span></div></div>
+        <div class="comment-list" id="comment-list-container"><div class="comment-card"><div class="user-text">PCからの信号を待機中...</div></div></div>
+    </div>
+
+    <div id="panel-control" class="tab-panel">
+        <div class="section-title"><span>Google Cloud ダイレクト接続盤 <span id="net-badge-control" class="net-status-badge net-online">DIRECT ONLINE</span></span><button class="yt-btn" style="width:auto; padding:4px 10px; font-size:11px;" onclick="loadYouTubeBroadcasts()">🔄 枠更新</button></div>
+        <div id="yt-live-control-container">アクティブな配信枠をスキャン中...</div>
+    </div>
+
+    <div id="panel-stats" class="tab-panel">
+        <div class="section-title"><span>チャンネルアナリティクス（直近28日間） <span id="net-badge-stats" class="net-status-badge net-online">DIRECT ONLINE</span></span></div>
+        <div id="yt-analytics-container">YouTube API サーバーから神データをハント中...</div>
+    </div>
+
+    <script>
+    // ⚙️ 【最重要】ここにメインPCの固定IPアドレスを入力してください！
+    const MAIN_PC_IP = "192.168.100.1"; 
+
+    const PC_DATA_URL = `http://${MAIN_PC_IP}:8000/api/data`;
+    const PC_TOKEN_URL = `http://${MAIN_PC_IP}:8000/api/youtube-token`;
+    const PC_STATS_URL = `http://${MAIN_PC_IP}:8000/api/youtube-stats`;
+    const PC_MIC_URL = `http://${MAIN_PC_IP}:8000/api/toggle-mic`;
+
+    let currentPC = 'main'; let cachedData = null; let toggleTimeout = null; let activeTab = 'status';
+
+    function def_wakeUpPhoneShield() {
+        const v = document.getElementById('no-sleep-video');
+        if (v && v.paused) { v.play().catch(() => {}); }
+    }
+    document.body.addEventListener('click', def_wakeUpPhoneShield, { once: false });
+    document.body.addEventListener('touchstart', def_wakeUpPhoneShield, { once: false });
+
+    function switchTab(tabName) {
+        activeTab = tabName;
+        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active-tab'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active-panel'));
+        document.getElementById(`tab-btn-${tabName}`).classList.add('active-tab');
+        document.getElementById(`panel-${tabName}`).classList.add('active-panel');
+        triggerToggleLit(); def_wakeUpPhoneShield();
+        if (tabName === 'control') { loadYouTubeBroadcasts(); }
+        if (tabName === 'stats') { loadChannelAnalytics(); }
+    }
+
+    // 🕒 ISO8601時間のフォーマットを日本時間に美しく翻訳する関数
+    function formatToJST(isoString) {
+        if (!isoString || isoString === "undefined" || isoString === "") return null;
+        try {
+            const d = new Date(isoString);
+            if (isNaN(d.getTime())) return null;
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            const hh = String(d.getHours()).padStart(2, '0');
+            const min = String(d.getMinutes()).padStart(2, '0');
+            return `📅 開始予定: ${yyyy}/${mm}/${dd} ${hh}:${min} (JST)`;
+        } catch { return null; }
+    }
+
+    // 👑 【爆速並行連撃】スマホから直接Google Cloudを叩いて一瞬で枠データを取得する
+    function proceedFetchBroadcasts(token) {
+        const controlContainer = document.getElementById('yt-live-control-container');
+        const bBadge = document.getElementById('net-badge-control');
+        
+        if(!token) {
+            controlContainer.innerHTML = '<div class="comment-card"><div class="user-text" style="color:#ff4444; text-align:center;">エラー: スマホ内のセキュア領域(LocalStorage)に通行証がありません。PC起動時に一度読み込ませてください。</div></div>';
+            return;
+        }
+        
+        const urlActive = `https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails&broadcastStatus=active&maxResults=5`;
+        const urlUpcoming = `https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails&broadcastStatus=upcoming&maxResults=5`;
+        const headers = { "Authorization": `Bearer ${token}`, "Accept": "application/json" };
+        
+        // 🚀 並行して2つのAPIを同時直撃（ラグ完全消失回路）
+        Promise.all([
+            fetch(urlActive, { headers }).then(r => r.json()),
+            fetch(urlUpcoming, { headers }).then(r => r.json())
+        ])
+        .then(results => {
+            const [resActive, resUpcoming] = results;
+            let allItems = [];
+            if (resActive && resActive.items) allItems = allItems.concat(resActive.items);
+            if (resUpcoming && resUpcoming.items) allItems = allItems.concat(resUpcoming.items);
+            
+            let seen = new Set(); let uniqueBroadcasts = [];
+            allItems.forEach(item => {
+                if (!seen.has(item.id) && item.status.lifeCycleStatus !== "created") {
+                    seen.add(item.id); uniqueBroadcasts.push(item);
+                }
+            });
+            
+            let liveHtml = '';
+            uniqueBroadcasts.forEach(b => {
+                const status = b.status.lifeCycleStatus;
+                const isLive = (status === 'live');
+                const title = b.snippet.title;
+                const isVertical = title.includes("縦配信") || title.toLowerCase().includes("shorts");
+                const currentDvr = b.contentDetails ? b.contentDetails.enableDvr : true;
+                const scheduledStartTime = b.snippet.scheduledStartTime || "";
+                const liveChatId = b.snippet.liveChatId || "";
+                
+                // 🕒 新機能：開始予定時間の翻訳
+                const jstTimeStr = formatToJST(scheduledStartTime);
+                const timeBadgeHtml = jstTimeStr ? `<div class="scheduled-time-zone">${jstTimeStr}</div>` : '';
+                
+                liveHtml += `
+                <div class="yt-broadcast-card">
+                    <span class="yt-tag ${isVertical?'vertical':'horizontal'}">${isVertical?'📱 縦配信枠':'🖥️ 横配信枠'}:${status.toUpperCase()}</span>
+                    
+                    ${timeBadgeHtml}
+                    
+                    <label class="yt-label">タイトル全文編集</label>
+                    <textarea class="yt-textarea" id="title-${b.id}" rows="2">${title}</textarea>
+                    <div class="dvr-row">
+                        <div style="font-size:13px; font-weight:bold;">公開設定:</div>
+                        <select class="yt-select dvr-select" id="privacy-${b.id}">
+                            <option value="public" ${b.status.privacyStatus==='public'?'selected':''}>🌐 公開</option>
+                            <option value="unlisted" ${b.status.privacyStatus==='unlisted'?'selected':''}>🔒 限定公開</option>
+                            <option value="private" ${b.status.privacyStatus==='private'?'selected':''}>👁️ 非公開</option>
+                        </select>
+                    </div>
+                    
+                    <div class="dvr-row" style="border-color:${isLive?'rgba(85,255,85,0.2)':'rgba(255,68,68,0.2)'};">
+                        <div style="font-size:12px; font-weight:bold;">
+                            DVR (追っかけ再生):<br>
+                            <span style="font-size:10px; color:${isLive?'#55ff55':'#ff4444'}; font-weight:bold;">
+                                ${isLive?'🟢 LIVE中: スマホ直接変更解放':'🔴 READY待機中: 500エラー防止ロック中'}
+                            </span>
+                        </div>
+                        <select class="yt-select dvr-select" id="dvr-${b.id}" ${!isLive?'disabled style="opacity:0.4; background:#222; color:rgba(255,170,68,0.5);"':''}>
+                            <option value="true" ${currentDvr===true?'selected':''}>🟢 許可 (ON)</option>
+                            <option value="false" ${currentDvr===false?'selected':''}>❌ 禁止 (OFF)</option>
+                        </select>
+                    </div>
+                    
+                    <button class="yt-btn" style="margin-bottom:15px; background:rgba(255,170,68,0.08);" onclick="pushYouTubeUpdate('${b.id}', '${status}', '${scheduledStartTime}', this)">⚡ YouTubeに直接設定を反映する</button>
+                    
+                    <label class="yt-label">配信主として公式チャットへ緊急投稿 (PC全落ち対応)</label>
+                    <div class="chat-input-zone">
+                        <input type="text" class="chat-txt" id="chatmsg-${b.id}" placeholder="スマホ回線からGoogleへ直接射出...">
+                        <button class="chat-send-btn" onclick="sendEmergencyChat('${b.id}', '${liveChatId}', this)">送信</button>
+                    </div>
+                    <div class="danger-zone">
+                        <span class="yt-label" style="color:#ff4444;">💀 最終宣告ゾーン</span>
+                        <button class="yt-btn" style="border-color:#ff4444; color:#ff4444; background:rgba(255,68,68,0.05);" onclick="forceEndBroadcast('${b.id}', this)">🚨 配信を完全に強制終了する</button>
+                    </div>
+                </div>`;
+            });
+            controlContainer.innerHTML = liveHtml || '<div class="comment-card"><div class="user-text" style="text-align:center;">現在オンライン・待機中の配信枠はありません。</div></div>';
+        })
+        .catch(err => {
+            controlContainer.innerHTML = `<div class="comment-card"><div class="user-text" style="color:#ff4444; text-align:center;">直接通信エラー: ${err}</div></div>`;
+        });
+    }
+
+    // 🔄 枠の読み込み処理（PCオフライントラップを完全解除）
+    function loadYouTubeBroadcasts() {
+        const bBadge = document.getElementById('net-badge-control');
+        
+        // ① まず通常通りPCから最新の鍵を取りに行く
+        fetch(PC_TOKEN_URL)
+        .then(res => res.json())
+        .then(tData => {
+            if(tData.token) { 
+                localStorage.setItem("cached_yt_token", tData.token); 
+                if(bBadge) { bBadge.innerText = "DIRECT ONLINE (PC連携済)"; bBadge.className = "net-status-badge net-online"; }
+            }
+            proceedFetchBroadcasts(localStorage.getItem("cached_yt_token"));
+        })
+        .catch(() => {
+            // 🚨 【PC全落ち時の身代わり発動】PC通信エラー時はスマホ内のLocalStorageキャッシュを使って即座にGoogleから直撃取得！
+            if(bBadge) { bBadge.innerText = "STANDALONE EMERGENCY (PC全落ち防御稼働中)"; bBadge.className = "net-status-badge net-offline"; }
+            proceedFetchBroadcasts(localStorage.getItem("cached_yt_token"));
+        });
+    }
+
+    function pushYouTubeUpdate(broadcastId, status, scheduledStartTime, targetBtn) {
+        const titleVal = document.getElementById(`title-${broadcastId}`).value;
+        const privacyVal = document.getElementById(`privacy-${broadcastId}`).value;
+        const dvrVal = document.getElementById(`dvr-${broadcastId}`).value;
+        const originalText = targetBtn.innerText;
+        
+        targetBtn.innerText = "⏳ Google Cloudへダイレクト書き込み中..."; targetBtn.style.borderColor = "#ff4444"; targetBtn.style.color = "#ff4444"; def_wakeUpPhoneShield();
+        
+        const token = localStorage.getItem("cached_yt_token");
+        if(!token) { alert("アクセストークンがありません。枠を一度更新してください。"); targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44"; return; }
+        
+        let partStr = "snippet,status";
+        let bodyObj = {
+            id: broadcastId,
+            snippet: { title: titleVal },
+            status: { privacyStatus: privacyVal }
+        };
+
+        if (scheduledStartTime && scheduledStartTime !== "" && scheduledStartTime !== "undefined") {
+            bodyObj.snippet.scheduledStartTime = scheduledStartTime;
+        }
+
+        if (status === "live") {
+            partStr += ",contentDetails";
+            bodyObj.contentDetails = { enableDvr: (dvrVal === "true") };
+        }
+        
+        fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts?part=${partStr}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(bodyObj)
+        })
+        .then(res => {
+            if(res.ok) {
+                targetBtn.innerText = "✅ 爆速反映が100%完了しました！"; targetBtn.style.borderColor = "#55ff55"; targetBtn.style.color = "#55ff55";
+                setTimeout(() => { targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44"; targetBtn.style.color = "#ffaa44"; loadYouTubeBroadcasts(); }, 1500);
+            } else {
+                return res.json().then(err => {
+                    alert("Google拒絶エラー: " + (err.error ? err.error.message : "反映に失敗しました。"));
+                    targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44"; targetBtn.style.color = "#ffaa44";
+                });
+            }
+        })
+        .catch(err => {
+            alert("ダイレクト通信失敗: " + err);
+            targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44";
+        });
+    }
+
+    function sendEmergencyChat(broadcastId, chatId, btn) {
+        const txtInput = document.getElementById(`chatmsg-${broadcastId}`); const msg = txtInput.value.trim();
+        if(!msg || !chatId || chatId === "null") { alert("メッセージが空、あるいはチャットIDがありません。"); return; }
+        const orig = btn.innerText; btn.innerText = ".."; btn.disabled = true;
+        
+        const token = localStorage.getItem("cached_yt_token");
+        if(!token) { alert("通行証がありません。"); btn.innerText = orig; btn.disabled = false; return; }
+        
+        fetch("https://www.googleapis.com/youtube/v3/liveChatMessages?part=snippet", {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                snippet: {
+                    liveChatId: chatId,
+                    type: "textMessageEvent",
+                    textMessageDetails: { messageText: msg }
+                }
+            })
+        })
+        .then(res => {
+            btn.innerText = orig; btn.disabled = false;
+            if(res.ok) { txtInput.value = ''; alert("🚀 スマホから直接公式チャットへ緊急射出しました！"); }
+            else { alert("Google側でチャット送信が弾かれました。"); }
+        })
+        .catch(() => { alert("通信エラー"); btn.innerText = orig; btn.disabled = false; });
+    }
+
+    function forceEndBroadcast(broadcastId, btn) {
+        if(!confirm("⚠️⚠️⚠️【超重大警告】⚠️⚠️⚠️\n本当に配信を強制終了してもよろしいですか？\nこの操作は絶対に取り消せません。")) return;
+        const orig = btn.innerText; btn.innerText = "⏳ 配信完全シャットダウン中..."; btn.disabled = true;
+        
+        const token = localStorage.getItem("cached_yt_token");
+        if(!token) { alert("通行証がありません。"); btn.disabled = false; btn.innerText = orig; return; }
+        
+        fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id=${broadcastId}&broadcastStatus=complete&part=status`, {
+            method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
+        })
+        .then(res => {
+            btn.disabled = false; btn.innerText = orig;
+            if(res.ok) { alert("YouTube側のライブストリームを完全終了させました。"); loadYouTubeBroadcasts(); }
+            else { alert("Googleへの強制終了命令が拒絶されました。"); }
+        })
+        .catch(() => { alert("通信エラー"); btn.disabled = false; btn.innerText = orig; });
+    }
+
+    function loadChannelAnalytics() {
+        const container = document.getElementById('yt-analytics-container');
+        const sBadge = document.getElementById('net-badge-stats');
+        
+        fetch(PC_STATS_URL)
+        .then(res => res.json())
+        .then(d => {
+            if (d.raw_token) { localStorage.setItem("cached_yt_token", d.raw_token); }
+            if(sBadge) { sBadge.innerText = "DIRECT ONLINE"; sBadge.className = "net-status-badge net-online"; }
+            
+            if(!d.success) { container.innerHTML = `<div class="comment-card"><div class="user-text" style="color:#ff4444;">データハント失敗: ${d.error}</div></div>`; return; }
+            
+            let warningHtml = '';
+            if(d.analytics_error) {
+                warningHtml = `<div style="color:#ffaa44; background:rgba(255,170,68,0.06); border:1px solid rgba(255,170,68,0.3); padding:10px; border-radius:6px; font-size:12px; font-weight:bold; margin-bottom:15px; text-align:center; line-height:1.4;">${d.analytics_error}</div>`;
+            }
+
+            let pastHtml = '';
+            d.past_videos.forEach(v => {
+                pastHtml += `
+                <div class="yt-broadcast-card" style="border-color:rgba(255,170,68,0.1); background:rgba(255,170,68,0.01); padding:10px; margin-bottom:8px;">
+                    <div style="font-size:12px; font-weight:bold; color:#fff; margin-bottom:6px;">🎬 ${v.title} <span style="font-size:10px; color:rgba(255,170,68,0.4); margin-left:6px;">(${v.date})</span></div>
+                    <div class="analytics-grid" style="margin-bottom:0; grid-template-columns: repeat(4, 1fr);">
+                        <div class="an-card" style="border:none; background:rgba(255,255,255,0.02); padding:4px;"><div class="an-label">最高同接</div><div class="an-val" style="color:#ffaa44; font-size:14px;">🔥 ${parseInt(v.max_viewers).toLocaleString()}</div></div>
+                        <div class="an-card" style="border:none; background:rgba(255,255,255,0.02); padding:4px;"><div class="an-label">総視聴数</div><div class="an-val" style="color:#fff; font-size:14px;">${parseInt(v.views).toLocaleString()}</div></div>
+                        <div class="an-card" style="border:none; background:rgba(255,255,255,0.02); padding:4px;"><div class="an-label">高評価</div><div class="an-val" style="color:#ff44aa; font-size:14px;">${parseInt(v.likes).toLocaleString()}</div></div>
+                        <div class="an-card" style="border:none; background:rgba(255,255,255,0.02); padding:4px;"><div class="an-label">コメント</div><div class="an-val" style="color:#00ffff; font-size:14px;">${parseInt(v.comments).toLocaleString()}</div></div>
+                    </div>
+                </div>`;
+            });
+
+            const subDeltaStr = d.an_28d_sub >= 0 ? `+${d.an_28d_sub}` : `${d.an_28d_sub}`;
+            const revenueStr = d.an_28d_rev === -1 ? "￥--" : `￥${parseInt(d.an_28d_rev).toLocaleString()}`;
+
+            container.innerHTML = `
+                <div style="font-size:16px; font-weight:bold; color:#fff; text-align:center; margin-bottom:12px; text-shadow:0 0 4px #ffaa44;">👑 ${d.channel_title}</div>
+                ${warningHtml}
+                <div class="analytics-grid" style="grid-template-columns: repeat(2, 1fr); gap:10px; margin-bottom:20px;">
+                    <div class="an-card" style="border-color:rgba(85,255,85,0.3); background:rgba(85,255,85,0.02); padding:15px 4px;">
+                        <div class="an-label" style="color:rgba(85,255,85,0.6);">💰 28日間 推定収益</div>
+                        <div class="an-val" style="color:#55ff55; font-size:26px;">${revenueStr}</div>
+                    </div>
+                    <div class="an-card" style="border-color:rgba(0,170,255,0.3); background:rgba(0,170,255,0.02); padding:15px 4px;">
+                        <div class="an-label" style="color:rgba(0,170,255,0.6);">⏳ 28日間 総再生時間</div>
+                        <div class="an-val" style="color:#00aaff; font-size:26px;">${d.an_28d_watch.toLocaleString()}h</div>
+                    </div>
+                    <div class="an-card" style="padding:12px 4px;">
+                        <div class="an-label">📈 登録者増減</div>
+                        <div class="an-val" style="color:#ffaa44;">${subDeltaStr}人</div>
+                    </div>
+                    <div class="an-card" style="padding:12px 4px;">
+                        <div class="an-label">👁️ 28日間 総視聴数</div>
+                        <div class="an-val" style="color:#fff;">${d.an_28d_views.toLocaleString()}回</div>
+                    </div>
+                </div>
+                <div class="analytics-grid" style="margin-bottom:20px; border-top:1px solid rgba(255,170,68,0.1); padding-top:15px;">
+                    <div class="an-card" style="border:none;"><div class="an-label">現在の登録者数</div><div class="an-val" style="font-size:16px;">${parseInt(d.subscribers).toLocaleString()}人</div></div>
+                    <div class="an-card" style="border:none;"><div class="an-label">累計再生回数</div><div class="an-val" style="font-size:16px;">${parseInt(d.total_views).toLocaleString()}回</div></div>
+                    <div class="an-card" style="border:none;"><div class="an-label">総公開動画数</div><div class="an-val" style="font-size:16px;">${parseInt(d.total_videos).toLocaleString()}本</div></div>
+                </div>
+                <div class="section-title"><span>直近ライブ配信アーカイブ総合通知表</span></div>
+                ${pastHtml || '<div class="user-text">アーカイブデータがありません</div>'}`;
+        })
+        .catch(() => {
+            if(sBadge) { sBadge.innerText = "OFFLINE (PCが停止しています)"; sBadge.className = "net-status-badge net-offline"; }
+            container.innerHTML = `<div class="comment-card"><div class="user-text" style="text-align:center; color:#ff4444;">PCがオフラインのためアナリティクスは表示できません。</div></div>`;
+        });
+    }
+
+    function toggleMicMute() {
+        if (cachedData && cachedData.obs_status_class === 'silent') { return; }
+        def_wakeUpPhoneShield();
+        fetch(PC_MIC_URL, { method: 'POST' }).then(() => { setTimeout(updateDashboard, 100); });
+    }
+    
+    function triggerToggleLit() {
+        const btn = document.getElementById('pc-toggle-btn'); btn.classList.add('lit');
+        if (toggleTimeout) clearTimeout(toggleTimeout); toggleTimeout = setTimeout(() => btn.classList.remove('lit'), 5000);
+    }
+    
+    function togglePC() { if (currentPC === 'main') { switchPC('sub'); } else { switchPC('main'); } }
+    function switchPC(target) {
+        currentPC = target; const btn = document.getElementById('pc-toggle-btn');
+        if (target === 'main') { btn.innerText = 'MAIN'; document.getElementById('ffmpeg-panel').style.display = 'none'; }
+        else { btn.innerText = 'SUB'; document.getElementById('ffmpeg-panel').style.display = 'block'; }
+        triggerToggleLit(); renderStats();
+    }
+
+    function renderStats() {
+        if (!cachedData) return;
+        const alertBox = document.getElementById('mic-alert'); alertBox.className = "mic-alert-box " + cachedData.obs_status_class; alertBox.innerText = cachedData.obs_status_text;
+        if (currentPC === 'main') {
+            document.getElementById('cpu-val').innerText = cachedData.cpu + '%'; document.getElementById('cpu-bar').style.width = cachedData.cpu + '%'; document.getElementById('cpu-temp-val').innerText = cachedData.cpu_temp + '°C'; document.getElementById('sys-ram-val').innerText = cachedData.sys_ram + 'GB';
+            document.getElementById('gpu-val').innerText = cachedData.gpu + '%'; document.getElementById('gpu-bar').style.width = cachedData.gpu + '%'; document.getElementById('cpu-power-val').innerText = cachedData.cpu_power + 'W'; document.getElementById('gpu-vram-val').innerText = cachedData.gpu_vram + 'GB';
+        } else {
+            document.getElementById('cpu-val').innerText = cachedData.sub_cpu + '%'; document.getElementById('cpu-bar').style.width = cachedData.sub_cpu + '%'; document.getElementById('cpu-temp-val').innerText = (cachedData.sub_cpu_temp > 0 ? cachedData.sub_cpu_temp : '--') + '°C'; document.getElementById('sys-ram-val').innerText = cachedData.sub_sys_ram + 'GB';
+            document.getElementById('gpu-val').innerText = cachedData.sub_gpu + '%'; document.getElementById('gpu-bar').style.width = cachedData.sub_gpu + '%';
+            let p_val = parseFloat(cachedData.sub_cpu_power); document.getElementById('cpu-power-val').innerText = (!isNaN(p_val) && p_val > 0 ? p_val.toFixed(1) : '--') + 'W'; document.getElementById('gpu-vram-val').innerText = cachedData.sub_gpu_vram + 'GB';
+            document.getElementById('ff-status').innerText = cachedData.sub_status + (cachedData.file_count > 0 ? ` (${cachedData.file_count}本目)` : ''); document.getElementById('ff-filename').innerText = cachedData.filename; document.getElementById('ff-time').innerText = cachedData.sub_time; document.getElementById('ff-speed').innerText = cachedData.speed; document.getElementById('ff-elapsed').innerText = cachedData.time_elapsed ? cachedData.time_elapsed : '--:--:--';
+            let br = cachedData.bitrate; if (br) { br = br.replace(new RegExp('kbits/s|kb/s|kbps|b/s', 'gi'), '').trim(); } document.getElementById('ff-bitrate').innerText = br ? br : '--';
+            document.getElementById('ff-total-pct').innerText = cachedData.sub_total_progress; let pctValue = parseFloat(cachedData.sub_total_progress) || 0; document.getElementById('ff-progress-bar').style.width = pctValue + '%';
+        }
+        document.getElementById('viewers-val').innerText = '👀 ' + cachedData.viewers; document.getElementById('likes-val').innerText = '👍 ' + cachedData.likes; document.getElementById('comment-list-container').innerHTML = cachedData.comment_list;
+    }
+
+    function updateDashboard() {
+        fetch(PC_DATA_URL)
+        .then(response => response.json())
+        .then(data => { 
+            cachedData = data; 
+            renderStats(); 
+        })
+        .catch(() => {
+            // PCダウン時は監視タブに「PCオフライン」と表示
+            document.getElementById('mic-alert').innerText = "🎙️ MIC: PC OFFLINE (接続切れ)";
+            document.getElementById('mic-alert').className = "mic-alert-box mute";
+        });
+    }
+    
+    // 初回自動起動
+    updateDashboard();
+    setInterval(updateDashboard, 2500);
+    </script>
+</body>
+</html>
