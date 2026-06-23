@@ -123,13 +123,13 @@
     </div>
 
     <div id="panel-control" class="tab-panel">
-        <div class="section-title"><span>Google Cloud ダイレクト接続盤 <span id="net-badge-control" class="net-status-badge net-online">DIRECT ONLINE</span></span><button class="yt-btn" style="width:auto; padding:4px 10px; font-size:11px;" onclick="loadYouTubeBroadcasts()">🔄 枠更新</button></div>
+        <div class="section-title"><span>Live Console <span id="net-badge-control" class="net-status-badge net-online">DIRECT ONLINE</span></span><button class="yt-btn" style="width:auto; padding:4px 10px; font-size:11px;" onclick="loadYouTubeBroadcasts()">🔄更新</button></div>
         <div id="yt-live-control-container">アクティブな配信枠をスキャン中...</div>
     </div>
 
     <div id="panel-stats" class="tab-panel">
         <div class="section-title"><span>チャンネルアナリティクス（直近28日間） <span id="net-badge-stats" class="net-status-badge net-online">DIRECT ONLINE</span></span></div>
-        <div id="yt-analytics-container">YouTube API サーバーから神データをハント中...</div>
+        <div id="yt-analytics-container">データを取得中...</div>
     </div>
 
     <script>
@@ -235,7 +235,7 @@
                         <select class="yt-select dvr-select" id="privacy-${b.id}">
                             <option value="public" ${b.status.privacyStatus==='public'?'selected':''}>🌐 公開</option>
                             <option value="unlisted" ${b.status.privacyStatus==='unlisted'?'selected':''}>🔒 限定公開</option>
-                            <option value="private" ${b.status.privacyStatus==='private'?'selected':''}>👁️ 非公開</option>
+                            <option value="private" ${b.status.privacyStatus==='private'?'selected':''}>⛔️ 非公開</option>
                         </select>
                     </div>
                     
@@ -243,7 +243,7 @@
                         <div style="font-size:12px; font-weight:bold;">
                             DVR (追っかけ再生):<br>
                             <span style="font-size:10px; color:${isLive?'#55ff55':'#ff4444'}; font-weight:bold;">
-                                ${isLive?'🟢 LIVE中: スマホ直接変更解放':'🔴 READY待機中: 500エラー防止ロック中'}
+                                ${isLive?'🟢 LIVE中: 変更可能':'🔴 READY待機中: ロック中'}
                             </span>
                         </div>
                         <select class="yt-select dvr-select" id="dvr-${b.id}" ${!isLive?'disabled style="opacity:0.4; background:#222; color:rgba(255,170,68,0.5);"':''}>
@@ -254,14 +254,14 @@
                     
                     <button class="yt-btn" style="margin-bottom:15px; background:rgba(255,170,68,0.08);" onclick="pushYouTubeUpdate('${b.id}', '${status}', '${scheduledStartTime}', this)">⚡ YouTubeに直接設定を反映する</button>
                     
-                    <label class="yt-label">配信主として公式チャットへ緊急投稿 (PC全落ち対応)</label>
+                    <label class="yt-label">チャット投稿</label>
                     <div class="chat-input-zone">
-                        <input type="text" class="chat-txt" id="chatmsg-${b.id}" placeholder="スマホ回線からGoogleへ直接射出...">
+                        <input type="text" class="chat-txt" id="chatmsg-${b.id}" placeholder="スマホから直接投稿">
                         <button class="chat-send-btn" onclick="sendEmergencyChat('${b.id}', '${liveChatId}', this)">送信</button>
                     </div>
                     <div class="danger-zone">
                         <span class="yt-label" style="color:#ff4444;">💀 最終宣告ゾーン</span>
-                        <button class="yt-btn" style="border-color:#ff4444; color:#ff4444; background:rgba(255,68,68,0.05);" onclick="forceEndBroadcast('${b.id}', this)">🚨 配信を完全に強制終了する</button>
+                        <button class="yt-btn" style="border-color:#ff4444; color:#ff4444; background:rgba(255,68,68,0.05);" onclick="forceEndBroadcast('${b.id}', this)">🚨 配信を強制終了する</button>
                     </div>
                 </div>`;
             });
@@ -288,7 +288,7 @@
         })
         .catch(() => {
             // 🚨 【PC全落ち・セキュリティ遮断の身代わり発動】
-            if(bBadge) { bBadge.innerText = "STANDALONE EMERGENCY (単独直撃稼働中)"; bBadge.className = "net-status-badge net-offline"; }
+            if(bBadge) { bBadge.innerText = "単独稼働中"; bBadge.className = "net-status-badge net-offline"; }
             proceedFetchBroadcasts(localStorage.getItem("cached_yt_token"));
         });
     }
@@ -299,7 +299,7 @@
         const dvrVal = document.getElementById(`dvr-${broadcastId}`).value;
         const originalText = targetBtn.innerText;
         
-        targetBtn.innerText = "⏳ Google Cloudへダイレクト書き込み中..."; targetBtn.style.borderColor = "#ff4444"; targetBtn.style.color = "#ff4444"; def_wakeUpPhoneShield();
+        targetBtn.innerText = "⏳ YouTubeへ書き込み中..."; targetBtn.style.borderColor = "#ff4444"; targetBtn.style.color = "#ff4444"; def_wakeUpPhoneShield();
         
         const token = localStorage.getItem("cached_yt_token");
         if(!token) { alert("アクセストークンがありません。枠を一度更新してください。"); targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44"; return; }
@@ -330,7 +330,7 @@
         })
         .then(res => {
             if(res.ok) {
-                targetBtn.innerText = "✅ 爆速反映が100%完了しました！"; targetBtn.style.borderColor = "#55ff55"; targetBtn.style.color = "#55ff55";
+                targetBtn.innerText = "✅ 反映が完了しました！"; targetBtn.style.borderColor = "#55ff55"; targetBtn.style.color = "#55ff55";
                 setTimeout(() => { targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44"; targetBtn.style.color = "#ffaa44"; loadYouTubeBroadcasts(); }, 1500);
             } else {
                 return res.json().then(err => {
@@ -366,7 +366,7 @@
         })
         .then(res => {
             btn.innerText = orig; btn.disabled = false;
-            if(res.ok) { txtInput.value = ''; alert("🚀 スマホから直接公式チャットへ緊急射出しました！"); }
+            if(res.ok) { txtInput.value = ''; alert("🚀 スマホからチャット投稿しました！"); }
             else { alert("Google側でチャット送信が弾かれました。"); }
         })
         .catch(() => { alert("通信エラー"); btn.innerText = orig; btn.disabled = false; });
@@ -384,8 +384,8 @@
         })
         .then(res => {
             btn.disabled = false; btn.innerText = orig;
-            if(res.ok) { alert("YouTube側のライブストリームを完全終了させました。"); loadYouTubeBroadcasts(); }
-            else { alert("Googleへの強制終了命令が拒絶されました。"); }
+            if(res.ok) { alert("ライブストリームを終了させました。"); loadYouTubeBroadcasts(); }
+            else { alert("YouTubeへの強制終了命令が拒絶されました。"); }
         })
         .catch(() => { alert("通信エラー"); btn.disabled = false; btn.innerText = orig; });
     }
@@ -400,7 +400,7 @@
             if (d.raw_token) { localStorage.setItem("cached_yt_token", d.raw_token); }
             if(sBadge) { sBadge.innerText = "DIRECT ONLINE"; sBadge.className = "net-status-badge net-online"; }
             
-            if(!d.success) { container.innerHTML = `<div class="comment-card"><div class="user-text" style="color:#ff4444;">データハント失敗: ${d.error}</div></div>`; return; }
+            if(!d.success) { container.innerHTML = `<div class="comment-card"><div class="user-text" style="color:#ff4444;">データ取得失敗: ${d.error}</div></div>`; return; }
             
             let warningHtml = '';
             if(d.analytics_error) {
@@ -450,7 +450,7 @@
                     <div class="an-card" style="border:none;"><div class="an-label">累計再生回数</div><div class="an-val" style="font-size:16px;">${parseInt(d.total_views).toLocaleString()}回</div></div>
                     <div class="an-card" style="border:none;"><div class="an-label">総公開動画数</div><div class="an-val" style="font-size:16px;">${parseInt(d.total_videos).toLocaleString()}本</div></div>
                 </div>
-                <div class="section-title"><span>直近ライブ配信アーカイブ総合通知表</span></div>
+                <div class="section-title"><span>直近ライブ配信</span></div>
                 ${pastHtml || '<div class="user-text">アーカイブデータがありません</div>'}`;
         })
         .catch(() => {
