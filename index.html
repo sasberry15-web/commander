@@ -170,7 +170,7 @@
     const MAIN_PC_IP = "192.168.10.103"; 
 
     const PC_DATA_URL = `http://${MAIN_PC_IP}:8000/api/data`;
-    const PC_TOKEN_URL = `http://${MAIN_PC_IP}:8000/api/youtube-token`;
+    const PC_TOKEN_URL = `http://${MAIN_PC_IP}:8002/api/youtube-token`; // 👈 👑 【急所大修正】8000から8002へ完全修正！これで空振りが消滅します！
     const PC_STATS_URL = `http://${MAIN_PC_IP}:8000/api/youtube-stats`;
     const PC_MIC_URL = `http://${MAIN_PC_IP}:8000/api/toggle-mic`;
     const PC_SCENE_URL = `http://${MAIN_PC_IP}:8000/api/obs-scene`;
@@ -429,7 +429,6 @@
         });
     }
 
-    // ⚡ 【最重要核心パッチ：遅延設定干渉バグの完全破砕】
     function pushYouTubeUpdate(broadcastId, status, scheduledStartTime, targetBtn) {
         const titleVal = document.getElementById(`title-${broadcastId}`).value;
         const privacyVal = document.getElementById(`privacy-${broadcastId}`).value;
@@ -443,7 +442,6 @@
         
         const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
         
-        // ① 先に現在の全設定パケットを引き抜く
         fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts?id=${broadcastId}&part=snippet,status,contentDetails`, { headers })
         .then(res => {
             if(!res.ok) throw new Error("既存設定のサルベージに失敗しました。");
@@ -453,22 +451,15 @@
             if(!getRes.items || getRes.items.length === 0) throw new Error("対象の配信枠がGoogle上で見つかりません。");
             
             let bodyObj = getRes.items[0];
-            
-            // ② 変更したい値をマージ
             bodyObj.snippet.title = titleVal;
             bodyObj.status.privacyStatus = privacyVal;
             
             let partStr = "snippet,status,contentDetails";
             
-            // 🛠️ 【今回のバグの急所】
-            // contentDetailsの中にlatencyPreference(遅延設定)が入ったままPUTすると、
-            // Googleが「他のオプションと同時に更新できない」とエラー(Latency preference not supported...)を吐く絶対ルールがあります。
-            // そのため、サルベージしたデータからlatencyPreferenceを完全に抹殺(除外)します。
             if (bodyObj.contentDetails && bodyObj.contentDetails.latencyPreference) {
                 delete bodyObj.contentDetails.latencyPreference;
             }
             
-            // DVRの変更は「LIVE化する前(upcoming)」のみ仕込む
             if (status !== "live") {
                 if(!bodyObj.contentDetails) bodyObj.contentDetails = {};
                 bodyObj.contentDetails.enableDvr = (dvrVal === "true");
@@ -476,7 +467,6 @@
             
             targetBtn.innerText = "⏳ Google Cloudへ反映中...";
             
-            // ③ latencyPreferenceを排除したクリーンな完全体オブジェクトでPUT送信
             return fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts?part=${partStr}`, {
                 method: 'PUT',
                 headers: headers,
@@ -521,7 +511,7 @@
             if (res.ok) {
                 return res.json().then(d => {
                     if(d.success) {
-                        txtInput.value = ''; alert("🚀 【PC代行ルート】チャット投稿に成功しました！");
+                        txtInput.value = ''; alert("🚀 【PC代過ルート】チャット投稿に成功しました！");
                         btn.innerText = orig; btn.disabled = false;
                     } else { throw new Error(d.error || "PC側のAPIエラー"); }
                 });
