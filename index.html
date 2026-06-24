@@ -371,35 +371,42 @@
         }).catch(err => { alert("通信失敗: " + err); targetBtn.innerText = originalText; });
     }
 
-    // 🚀 【2系統自動選別ルーター回路】PC代行 ➔ スマホ単独直撃
+    // 🚀 【爆速タイムアウト＆2系統自動選別ルーター】
     function sendEmergencyChat(broadcastId, chatId, btn) {
         const txtInput = document.getElementById(`chatmsg-${broadcastId}`); const msg = txtInput.value.trim();
         if(!msg || !chatId || chatId === "null" || chatId === "") { alert("エラー: 有効なチャットIDが見つかりません。"); return; }
         const orig = btn.innerText; btn.innerText = ".."; btn.disabled = true;
         
-        // 🟢 【ルートA】まずはPC代行ルートを突撃（CORS制限を完全回避）
+        // ⏱️ PCの反応を最大1.5秒だけ待つためのタイマーコントローラー
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1500);
+
+        // 🟢 【ルートA】PC代行ルートをまず急襲（1.5秒で見切る爆速設計）
         fetch(`http://${MAIN_PC_IP}:8000/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: chatId, message: msg })
+            body: JSON.stringify({ chat_id: chatId, message: msg }),
+            signal: controller.signal // 👈 タイムアウト信号を紐付け
         })
         .then(res => {
+            clearTimeout(timeoutId); // 1.5秒以内に反応があったのでタイマー解除
             if (res.ok) {
                 return res.json().then(d => {
                     if(d.success) {
-                        txtInput.value = ''; 
-                        alert("🚀 【PC代行ルート】チャット投稿に成功しました！");
+                        txtInput.value = ''; alert("🚀 【PC代行ルート】チャット投稿に成功しました！");
                         btn.innerText = orig; btn.disabled = false;
                     } else { throw new Error(d.error || "PC側のAPIエラー"); }
                 });
-            } else { throw new Error("PCオフライン"); }
+            } else { throw new Error("PC側サーバーエラー"); }
         })
         .catch(err => {
-            // 🚨 【ルートB】PC接続切れの時は、スマホ単独直撃ルートへ緊急スイッチ！
-            console.log("PC非稼働のため、スマホ直接ルートへ切り替えます:", err);
+            clearTimeout(timeoutId);
+            // 🚨 【ルートB】PC接続切れ、または1.5秒以内に返事がない場合は瞬時にここへ緊急スイッチ！
+            console.log("PCルートを断念。スマホ単独直撃ルートへフォールバックします:", err.message);
+            
             const token = localStorage.getItem("cached_yt_token");
             if(!token) { 
-                alert("❌ 通行証(token)がありません。"); 
+                alert("❌ PC代行が失敗し、スマホ内に通行証(token)がないため投稿できません。"); 
                 btn.innerText = orig; btn.disabled = false; return; 
             }
             
@@ -419,8 +426,9 @@
                 if(res.ok) { txtInput.value = ''; alert("📱 【スマホ緊急直撃】チャット投稿に成功しました！"); }
                 else { 
                     return res.json().then(errData => {
-                        const errMsg = errData.error ? errData.error.message : "制限エラー";
-                        alert(`❌ 投稿失敗:\n${errMsg}`);
+                        const errMsg = errData.error ? errData.error.message : "ステータスエラー";
+                        // ※Googleの仕様上、枠が完全に「LIVE中」でないとチャット投稿は400/403エラーになります
+                        alert(`❌ 投稿失敗（※枠がLIVE中でのみ投稿可能です）\nGoogleエラー詳細:\n${errMsg}`);
                     });
                 }
             })
