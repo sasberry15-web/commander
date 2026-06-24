@@ -370,40 +370,79 @@
         }).catch(err => { alert("通信失敗: " + err); targetBtn.innerText = originalText; });
     }
 
-    // 💥 【核心修正】チャット投稿エラーの生データを可視化する回路
+   // 🚀 【完全二重化】PC代行 ➔ スマホ直撃への全自動フォールバック回路
     function sendEmergencyChat(broadcastId, chatId, btn) {
-        const txtInput = document.getElementById(`chatmsg-${broadcastId}`); const msg = txtInput.value.trim();
-        if(!msg || !chatId || chatId === "null" || chatId === "") { alert("エラー: 有効なチャットIDが見つかりません。(※枠が配信中(LIVE)でないと投稿できない場合があります)"); return; }
+        const txtInput = document.getElementById(`chatmsg-${broadcastId}`); 
+        const msg = txtInput.value.trim();
+        if(!msg || !chatId || chatId === "null" || chatId === "") { 
+            alert("エラー: 有効なチャットIDが見つかりません。"); 
+            return; 
+        }
         const orig = btn.innerText; btn.innerText = ".."; btn.disabled = true;
-        
-        const token = localStorage.getItem("cached_yt_token");
-        if(!token) { alert("通行証がありません。"); btn.innerText = orig; btn.disabled = false; return; }
-        
-        fetch("https://www.googleapis.com/youtube/v3/liveChatMessages?part=snippet", {
+
+        // 🔥 【ルートA】まずはPC代行ルートを突撃（CORSが起きず100%安全・高速）
+        fetch(`http://${MAIN_PC_IP}:8000/api/chat`, {
             method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                snippet: {
-                    liveChatId: chatId,
-                    type: "textMessageEvent",
-                    textMessageDetails: { messageText: msg }
-                }
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, message: msg })
         })
         .then(res => {
-            btn.innerText = orig; btn.disabled = false;
-            if(res.ok) { txtInput.value = ''; alert("🚀 スマホからチャット投稿しました！"); }
-            else { 
-                // 🔍 Googleからのリアルな怒りの理由をポップアップ表示
-                return res.json().then(errData => {
-                    const errMsg = errData.error ? errData.error.message : "不明な制限エラー";
-                    alert(`❌ Google拒絶エラー詳細:\n${errMsg}`);
+            if (res.ok) {
+                return res.json().then(d => {
+                    if(d.success) {
+                        txtInput.value = ''; 
+                        alert("🚀 【PC代行ルート】公式チャットへ爆速投稿しました！");
+                        btn.innerText = orig; btn.disabled = false;
+                    } else {
+                        throw new Error(d.error || "PC側でのGoogleAPIエラー");
+                    }
                 });
+            } else {
+                throw new Error("PCサーバー応答エラー");
             }
         })
-        .catch(err => { alert("通信エラー: " + err); btn.innerText = orig; btn.disabled = false; });
+        .catch(err => {
+            // 🚨 【ルートB】PCがオフライン、または直結Wi-Fiから外れている場合はスマホ単独直撃に自動スイッチ！
+            console.log("PCが応答しないため、スマホ単独直撃ルートへ緊急フォールバックします:", err);
+            
+            const token = localStorage.getItem("cached_yt_token");
+            if(!token) { 
+                alert("❌ PC代行が失敗し、スマホ内にも通行証(token)がないため投稿できません。"); 
+                btn.innerText = orig; btn.disabled = false; 
+                return; 
+            }
+            
+            fetch("https://www.googleapis.com/youtube/v3/liveChatMessages?part=snippet", {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    snippet: {
+                        liveChatId: chatId,
+                        type: "textMessageEvent",
+                        textMessageDetails: { messageText: msg }
+                    }
+                })
+            })
+            .then(res => {
+                btn.innerText = orig; btn.disabled = false;
+                if(res.ok) { 
+                    txtInput.value = ''; 
+                    alert("📱 【スマホ緊急直撃】Google Cloudへ直接投稿に成功しました！"); 
+                } else { 
+                    return res.json().then(errData => {
+                        const errMsg = errData.error ? errData.error.message : "不明な制限エラー";
+                        alert(`❌ 両ルート完全失敗。\nGoogle拒絶エラー詳細:\n${errMsg}`);
+                    });
+                }
+            })
+            .catch(e => { 
+                alert("通信エラー: 両方のルートへの到達に失敗しました。"); 
+                btn.innerText = orig; btn.disabled = false; 
+            });
+        });
     }
 
+        
     function forceEndBroadcast(broadcastId, btn) {
         if(!confirm("⚠️⚠️⚠️【超重大警告】⚠️⚠️⚠️\n本当に配信を強制終了してもよろしいですか？\nこの操作は絶対に取り消せません。")) return;
         const orig = btn.innerText; btn.innerText = "⏳ 配信終了中..."; btn.disabled = true;
