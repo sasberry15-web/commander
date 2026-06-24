@@ -29,7 +29,7 @@
         .stat-inline-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .stat-side-label { font-size: 13px; font-weight: bold; color: rgba(255, 170, 68, 0.35); letter-spacing: 1px; }
         .stat-value { font-size: 32px; font-weight: bold; font-family: 'Courier New', Courier, monospace; text-shadow: 0 0 8px rgba(255, 170, 68, 0.4); }
-        .stat-bar { height: 3px; background: rgba(255, 170, 68, 0.05); margin-top: 4px; border-radius: 2px; overflow: hidden; }
+        .stats-bar { height: 3px; background: rgba(255, 170, 68, 0.05); margin-top: 4px; border-radius: 2px; overflow: hidden; }
         .stat-fill { height: 100%; background: #ffaa44; box-shadow: 0 0 6px #ffaa44; transition: width 0.4s ease; }
         .stat-sub-row { display: flex; justify-content: space-between; margin-top: 6px; font-size: 13px; font-family: 'Courier New', Courier, monospace; color: rgba(255, 170, 68, 0.7); padding: 0 2px; }
         .mem-zone { display: flex; align-items: center; }
@@ -89,7 +89,6 @@
         .obs-go-btn { background: rgba(255, 170, 68, 0.02); border: 1px solid rgba(255, 170, 68, 0.2); color: rgba(255, 170, 68, 0.7); padding: 12px 6px; border-radius: 4px; font-size: 14px; font-weight: bold; cursor: pointer; text-align: center; transition: all 0.2s ease; }
         .obs-go-btn:active { background: rgba(255, 170, 68, 0.1); }
         
-        /* 🛠️ シーンマネージャー窓の特別デザイン */
         .scene-mgr-box { background: rgba(255,170,68,0.02); border: 1px solid rgba(255,170,68,0.15); border-radius: 6px; padding: 10px; margin-bottom: 18px; display: none; }
         .scene-mgr-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
         .scene-mgr-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #fff; background: #111; padding: 6px; border-radius: 4px; }
@@ -112,13 +111,13 @@
         <div class="stats-container">
             <div class="stat-card">
                 <div class="stat-inline-row"><span class="stat-side-label">CPU</span><span class="stat-value" id="cpu-val">--%</span></div>
-                <div class="stat-bar"><div class="stat-fill" id="cpu-bar" style="width: 0%;"></div></div>
+                <div class="stats-bar"><div class="stat-fill" id="cpu-bar" style="width: 0%;"></div></div>
                 <div class="stat-sub-row"><span id="cpu-temp-val">--°C</span><div class="mem-zone"><span class="mem-label">RAM</span><span id="sys-ram-val">--GB</span></div></div>
             </div>
             <div class="toggle-switch-zone"><div class="toggle-button" id="pc-toggle-btn" onclick="togglePC()">MAIN</div></div>
             <div class="stat-card">
                 <div class="stat-inline-row"><span class="stat-side-label">GPU</span><span class="stat-value" id="gpu-val">--%</span></div>
-                <div class="stat-bar"><div class="stat-fill" id="gpu-bar" style="width: 0%;"></div></div>
+                <div class="stats-bar"><div class="stat-fill" id="gpu-bar" style="width: 0%;"></div></div>
                 <div class="stat-sub-row"><span id="cpu-power-val">--W</span><div class="mem-zone"><span class="mem-label">VRAM</span><span id="gpu-vram-val">--GB</span></div></div>
             </div>
         </div>
@@ -126,7 +125,7 @@
         <div class="ffmpeg-panel" id="ffmpeg-panel">
             <div class="ffmpeg-header"><span>🎬 全体進捗 <span id="ff-total-pct" style="margin-left: 8px; background: rgba(255,136,0,0.1); padding: 2px 8px; border-radius: 4px; color: #ffaa44; font-weight: bold; border: 1px solid rgba(255,136,0,0.2);">--</span></span><span id="ff-status" style="color: #ffaa44; font-weight: bold;">待機中</span></div>
             <div class="ffmpeg-file">ファイル: <span id="ff-filename">--</span></div>
-            <div class="stat-bar" style="height: 4px; background: rgba(255, 170, 68, 0.02); margin-bottom: 12px; border-radius: 2px; overflow: hidden;"><div class="stat-fill" id="ff-progress-bar" style="width: 0%; height: 100%; background: #ffaa44; box-shadow: 0 0 6px #ffaa44; transition: width 0.4s ease;"></div></div>
+            <div class="stats-bar" style="height: 4px; background: rgba(255, 170, 68, 0.02); margin-bottom: 12px; border-radius: 2px; overflow: hidden;"><div class="stat-fill" id="ff-progress-bar" style="width: 0%; height: 100%; background: #ffaa44; box-shadow: 0 0 6px #ffaa44; transition: width 0.4s ease;"></div></div>
             <div class="ffmpeg-grid"><div>進捗: <span id="ff-time">--:--:--</span></div><div>速度: <span id="ff-speed">--x</span></div><div>ビットレート: <span id="ff-bitrate">--</span></div><div>経過: <span id="ff-elapsed">--:--:--</span></div></div>
         </div>
         <div class="section-title"><span>コメント配信状況</span><div class="live-status"><span class="status-item" id="viewers-val" style="color: #ffaa44; text-shadow: 0 0 6px rgba(255,170,68,0.4);">👀 --</span><span class="status-item" id="likes-val" style="color: #ff44aa; border-color: rgba(255,68,170,0.08); text-shadow: 0 0 6px rgba(255,68,170,0.4);">👍 --</span></div></div>
@@ -148,12 +147,21 @@
             <div class="user-text" style="grid-column: span 2; text-align:center; color:rgba(255,170,68,0.4);">OBSからシーン構成をロード中...</div>
         </div>
 
-        <div class="section-title"><span>Google Cloud ダイレクト接続盤 <span id="net-badge-control" class="net-status-badge net-online">DIRECT ONLINE</span></span><button class="yt-btn" style="width:auto; padding:4px 10px; font-size:11px;" onclick="loadYouTubeBroadcasts()">🔄 枠更新</button></div>
+        <div class="section-title">
+            <span>Google Cloud 接続盤 <span id="net-badge-control" class="net-status-badge net-online">DIRECT ONLINE</span></span>
+            <div style="display:flex; gap:6px;">
+                <button class="yt-btn" style="width:auto; padding:4px 8px; font-size:11px; border-color:#00ffff; color:#00ffff;" onclick="forceRenewTokenUI()">🔑 鍵の再取得</button>
+                <button class="yt-btn" style="width:auto; padding:4px 8px; font-size:11px;" onclick="loadYouTubeBroadcasts()">🔄 枠更新</button>
+            </div>
+        </div>
         <div id="yt-live-control-container">アクティブな配信枠をスキャン中...</div>
     </div>
 
     <div id="panel-stats" class="tab-panel">
-        <div class="section-title"><span>チャンネルアナリティクス（直近28日間） <span id="net-badge-stats" class="net-status-badge net-online">DIRECT ONLINE</span></span></div>
+        <div class="section-title">
+            <span>チャンネルアナリティクス（直近28日間） <span id="net-badge-stats" class="net-status-badge net-online">DIRECT ONLINE</span></span>
+            <button class="yt-btn" style="width:auto; padding:4px 8px; font-size:11px; border-color:#00ffff; color:#00ffff;" onclick="forceRenewTokenUI()">🔑 鍵の再取得</button>
+        </div>
         <div id="yt-analytics-container">YouTube API サーバーから神データをハント中...</div>
     </div>
 
@@ -169,7 +177,6 @@
     let currentPC = 'main'; let cachedData = null; let toggleTimeout = null; let activeTab = 'status';
     let wakeLock = null;
 
-    // 📱 画面の自動消灯（スリープ）を100%防止する防壁
     async function requestWakeLock() {
         try {
             if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); }
@@ -196,39 +203,69 @@
         if (tabName === 'stats') { loadChannelAnalytics(); }
     }
 
-    // ⚙️ 表示管理窓のトグル
+    function forceRenewTokenSilent() {
+        fetch(PC_TOKEN_URL)
+        .then(res => res.json())
+        .then(tData => {
+            if(tData.token) { 
+                localStorage.setItem("cached_yt_token", tData.token);
+                console.log("🔄 [常時備蓄防衛] メインPCから最新トークンを自動ハントし、スマホ側を最新化しました。");
+            }
+        })
+        .catch(() => {
+            console.log("📡 [常時備蓄防衛] PCがオフライン、または未起動のため自動リフレッシュをスキップ。");
+        });
+    }
+
+    function forceRenewTokenUI() {
+        alert("⏳ 認証の再同期リクエストを発射します...");
+        fetch(PC_TOKEN_URL)
+        .then(res => res.json())
+        .then(tData => {
+            if(tData.token) { 
+                localStorage.setItem("cached_yt_token", tData.token);
+                alert("✅ 【PC連携成功】メインPCから最新の1時間トークンをハントし、同期完了しました！");
+            } else { alert("⚠ PCから空の鍵が返されました。スマホ内の既存の鍵を維持します。"); }
+            refreshCurrentTabContent();
+        })
+        .catch(() => {
+            alert("📡 【PCオフライン確認】\nスマホ単独モードで稼働中。現在LocalStorageに蓄積されている通行証を使って、直接YouTubeへ接続を試みます。");
+            refreshCurrentTabContent();
+        });
+    }
+
+    function refreshCurrentTabContent() {
+        if(activeTab === 'control') loadYouTubeBroadcasts();
+        if(activeTab === 'stats') loadChannelAnalytics();
+    }
+
+    style = document.createElement('style');
+    style.innerHTML = '.yt-select:disabled { opacity: 0.55 !important; background: #151515 !important; color: rgba(255,170,68,0.5) !important; border-color: rgba(255,170,68,0.1) !important; }';
+    document.head.appendChild(style);
+
     function toggleSceneManagerWindow() {
         const w = document.getElementById('scene-manager-window');
         w.style.display = (w.style.display === 'block') ? 'none' : 'block';
     }
 
-    // LocalStorageから非表示にするシーン名リストを取得
     function getHiddenScenes() {
         const data = localStorage.getItem("obs_hidden_scenes");
         return data ? JSON.parse(data) : [];
     }
 
-    // チェックボックスの状態変化を検知して保存・再描画
     function onSceneCheckChange(sceneName, isChecked) {
         let hiddenList = getHiddenScenes();
-        if (isChecked) {
-            hiddenList = hiddenList.filter(name => name !== sceneName); // 表示にする
-        } else {
-            if (!hiddenList.includes(sceneName)) hiddenList.push(sceneName); // 非表示リストに追加
-        }
+        if (isChecked) { hiddenList = hiddenList.filter(name => name !== sceneName); } 
+        else { if (!hiddenList.includes(sceneName)) hiddenList.push(sceneName); }
         localStorage.setItem("obs_hidden_scenes", JSON.stringify(hiddenList));
         if (cachedData) renderObsScenes(cachedData.obs_scenes, cachedData.current_scene);
     }
 
-    // 管理窓の中のチェックボックスリストを生成
     function updateSceneManagerUI() {
         if (!cachedData || !cachedData.obs_scenes) return;
         const container = document.getElementById('scene-manager-checkboxes');
         const hiddenList = getHiddenScenes();
-        
-        // 上からの並び（反転）で管理用チェックボックスを並べる
         const sortedScenes = [...cachedData.obs_scenes].reverse();
-        
         container.innerHTML = sortedScenes.map(name => {
             const isChecked = !hiddenList.includes(name);
             return `
@@ -240,27 +277,18 @@
         }).join('');
     }
 
-    // 🎬 シーンUI描画（並び順上から・ポチポチ選んだハイド反映機能）
     function renderObsScenes(scenes, currentScene) {
         const container = document.getElementById('obs-scenes-container');
         if (!scenes || scenes.length === 0) {
             container.innerHTML = '<div class="user-text" style="grid-column: span 2; text-align:center; color:rgba(255,170,68,0.4);">OBSがオフライン、またはシーンがありません。</div>';
             return;
         }
-
         const hiddenList = getHiddenScenes();
-        
-        // ① 下からの順の配列を反転して「上からの順」にする
-        // ② ポチポチ選んでチェックを外した（隠した）シーンを弾く
-        const filteredScenes = [...scenes]
-            .reverse()
-            .filter(name => !hiddenList.includes(name));
-
+        const filteredScenes = [...scenes].reverse().filter(name => !hiddenList.includes(name));
         if (filteredScenes.length === 0) {
             container.innerHTML = '<div class="user-text" style="grid-column: span 2; text-align:center; color:rgba(255,170,68,0.4);">すべてのシーンが非表示設定になっています。</div>';
             return;
         }
-
         container.innerHTML = filteredScenes.map(name => {
             const isActive = (name === currentScene);
             const activeStyle = isActive ? 'style="background: rgba(85,255,85,0.08) !important; border-color: #55ff55 !important; color: #55ff55 !important; text-shadow: 0 0 6px rgba(85,255,85,0.4);"' : '';
@@ -273,7 +301,6 @@
         }).join('');
     }
 
-    // 🔁 OBSシーン切り替え発射（タップ即点灯の超高速・楽観的UI）
     function triggerSceneSwitch(sceneName) {
         if (cachedData) {
             cachedData.current_scene = sceneName;
@@ -303,7 +330,7 @@
     function proceedFetchBroadcasts(token) {
         const controlContainer = document.getElementById('yt-live-control-container');
         if(!token) {
-            controlContainer.innerHTML = '<div class="comment-card"><div class="user-text" style="color:#ff4444; text-align:center;">エラー: 通行証(token)がありません。</div></div>';
+            controlContainer.innerHTML = '<div class="comment-card"><div class="user-text" style="color:#ff4444; text-align:center;">エラー: 通行証(token)がありません。PCを起動するか「鍵の再取得」を押してください。</div></div>';
             return;
         }
         
@@ -355,14 +382,14 @@
                         </select>
                     </div>
                     
-                    <div class="dvr-row" style="border-color:${isLive?'rgba(85,255,85,0.2)':'rgba(255,68,68,0.2)'};">
+                    <div class="dvr-row" style="border-color:${isLive?'rgba(255,68,68,0.2)':'rgba(85,255,85,0.2)'};">
                         <div style="font-size:12px; font-weight:bold;">
                             DVR (追っかけ再生):<br>
-                            <span style="font-size:10px; color:${isLive?'#55ff55':'#ff4444'}; font-weight:bold;">
-                                ${isLive?'🟢 LIVE中: 変更可能':'🔴 READY待機中: ロック中'}
+                            <span style="font-size:10px; color:${isLive?'#ff4444':'#55ff55'}; font-weight:bold;">
+                                ${isLive?'🔴 LIVE中: 閲覧のみ（ロック中）':'🟢 待機枠: スマホから変更可能'}
                             </span>
                         </div>
-                        <select class="yt-select dvr-select" id="dvr-${b.id}" ${!isLive?'disabled style="opacity:0.4; background:#222; color:rgba(255,170,68,0.5);"':''}>
+                        <select class="yt-select dvr-select" id="dvr-${b.id}" ${isLive?'disabled':''}>
                             <option value="true" ${currentDvr===true?'selected':''}>🟢 許可 (ON)</option>
                             <option value="false" ${currentDvr===false?'selected':''}>❌ 禁止 (OFF)</option>
                         </select>
@@ -381,10 +408,10 @@
                     </div>
                 </div>`;
             });
-            controlContainer.innerHTML = liveHtml || '<div class="comment-card"><div class="user-text" style="text-align:center;">現在オンライン・待機中の配信枠はありません。</div></div>';
+            controlContainer.innerHTML = liveHtml || '<div class="comment-card"><div class="user-text" style="text-align:center;">現在オンライン・待機中の配信枠はありません。1時間を超えた場合はPCを起動するか「鍵の再取得」をお試しください。</div></div>';
         })
         .catch(err => {
-            controlContainer.innerHTML = `<div class="comment-card"><div class="user-text" style="color:#ff4444; text-align:center;">直接通信エラー: ${err}</div></div>`;
+            controlContainer.innerHTML = `<div class="comment-card"><div class="user-text" style="color:#ff4444; text-align:center;">通信遮断エラー（鍵の有効期限が切れた可能性があります。「鍵の再取得」を押してください）</div></div>`;
         });
     }
 
@@ -421,7 +448,9 @@
         if (scheduledStartTime && scheduledStartTime !== "" && scheduledStartTime !== "undefined") {
             bodyObj.snippet.scheduledStartTime = scheduledStartTime;
         }
-        if (status === "live") {
+        
+        // 🔒 【API仕様完全準拠】DVRの変更は「LIVE化する前(upcoming)」のみパケットに含める。LIVE中の場合は送信エラーになるため除外。
+        if (status !== "live") {
             partStr += ",contentDetails";
             bodyObj.contentDetails = { enableDvr: (dvrVal === "true") };
         }
@@ -437,24 +466,21 @@
                 setTimeout(() => { targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44"; targetBtn.style.color = "#ffaa44"; loadYouTubeBroadcasts(); }, 1500);
             } else {
                 return res.json().then(err => {
-                    alert("Google拒絶エラー: " + (err.error ? err.error.message : "反映失敗。"));
+                    alert("Google拒絶エラー: " + (err.error ? err.error.message : "反映失敗。1時間期限切れの可能性。"));
                     targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44";
                 });
             }
         }).catch(err => { alert("通信失敗: " + err); targetBtn.innerText = originalText; });
     }
 
-    // 🚀 【完全二重化】PC代行(5秒ゆとり化) ➔ スマホアプリ公式配信ページ直撃フォールバック
     function sendEmergencyChat(broadcastId, chatId, btn) {
         const txtInput = document.getElementById(`chatmsg-${broadcastId}`); const msg = txtInput.value.trim();
         if(!msg || !chatId || chatId === "null" || chatId === "") { alert("エラー: 有効なチャットIDが見つかりません。"); return; }
         const orig = btn.innerText; btn.innerText = ".."; btn.disabled = true;
         
-        // ⏱️ PCの処理（Google通信含む）をゆったり5秒待つためのタイマーコントローラー
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 👈 1.5秒から5秒へ延長して誤判定を徹底ガード
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        // 🟢 【ルートA】PC代行ルートを突撃（CORS制限を完全回避）
         fetch(`http://${MAIN_PC_IP}:8000/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -462,29 +488,20 @@
             signal: controller.signal
         })
         .then(res => {
-            clearTimeout(timeoutId); // 5秒以内に反応があったのでタイマー解除
+            clearTimeout(timeoutId);
             if (res.ok) {
                 return res.json().then(d => {
                     if(d.success) {
-                        txtInput.value = ''; 
-                        alert("🚀 【PC代行ルート】チャット投稿に成功しました！");
+                        txtInput.value = ''; alert("🚀 【PC代行ルート】チャット投稿に成功しました！");
                         btn.innerText = orig; btn.disabled = false;
                     } else { throw new Error(d.error || "PC側のAPIエラー"); }
                 });
-            } else { throw new Error("PC側サーバーエラー"); }
+            } else { throw new Error("PCオフライン"); }
         })
         .catch(err => {
-            clearTimeout(timeoutId);
-            btn.innerText = orig; btn.disabled = false;
-            
-            // 🚨 【ルートB：緊急フォールバック（ブランドアカウント完全対応版）】
-            // アプリ側の解釈バグ（Text画面）とアカウント固定問題を両方解決するため、
-            // 該当配信枠の「公式視聴・待機ページURL」をスマホから直接展開します。
-            console.log("PCルート断念、またはタイムアウト。公式アプリリンクを展開します:", err.message);
-            
+            clearTimeout(timeoutId); btn.innerText = orig; btn.disabled = false;
+            console.log("PCルート断念。公式アプリリンクを展開します:", err.message);
             if (confirm("⚠️ 【PC応答なし / タイムアウト】\nPC経由での投稿がタイムアウトしたか、PCがオフラインです。スマホの【YouTube公式アプリ】で配信ページを開き、配信主として直接チャットを投稿しますか？")) {
-                // プレースホルダーのバグを回避するため、動画・配信ページそのもののURLを開きます
-                // スマートフォン環境であれば、自動的にYouTube公式アプリが起動し、アプリ側でログイン・切り替えているブランドアカウントのまま安全にチャットが可能です
                 window.open(`https://www.youtube.com/watch?v=${broadcastId}`, '_blank');
                 txtInput.value = ''; 
             }
@@ -571,7 +588,7 @@
         })
         .catch(() => {
             if(sBadge) { sBadge.innerText = "OFFLINE (PC停止中)"; sBadge.className = "net-status-badge net-offline"; }
-            container.innerHTML = `<div class="comment-card"><div class="user-text" style="text-align:center; color:#ff4444;">PCオフラインのため取得できません。</div></div>`;
+            container.innerHTML = `<div class="comment-card"><div class="user-text" style="text-align:center; color:#ff4444;">PCオフラインのため取得できません。スマホ内蔵の鍵を使って「操作パネル」側を復旧させることは可能です。</div></div>`;
         });
     }
 
@@ -626,11 +643,8 @@
         
         if (activeTab === 'control') {
             renderObsScenes(cachedData.obs_scenes, cachedData.current_scene);
-            // 🎬 シーン構成に変更があったときだけ管理用のチェックボックス群を裏で最新化
             const checkboxCount = document.getElementById('scene-manager-checkboxes').children.length;
-            if (cachedData.obs_scenes && checkboxCount !== cachedData.obs_scenes.length) {
-                updateSceneManagerUI();
-            }
+            if (cachedData.obs_scenes && checkboxCount !== cachedData.obs_scenes.length) { updateSceneManagerUI(); }
         }
     }
 
@@ -641,8 +655,11 @@
         });
     }
     
+    forceRenewTokenSilent();
+    
     updateDashboard();
     setInterval(updateDashboard, 2500);
+    setInterval(forceRenewTokenSilent, 1800000);
     </script>
 </body>
 </html>
