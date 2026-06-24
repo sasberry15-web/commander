@@ -145,6 +145,9 @@
     <script>
     const MAIN_PC_IP = "192.168.10.103"; 
 
+        // 🙈 【設定】スマホ画面に表示したくない（ハイドしたい）OBSのシーン名をここに入れてください
+    const HIDE_SCENES = ["配信停止画面", "ソース確認用", "裏画面", "使わないシーン名"];
+
     const PC_DATA_URL = `http://${MAIN_PC_IP}:8000/api/data`;
     const PC_TOKEN_URL = `http://${MAIN_PC_IP}:8000/api/youtube-token`;
     const PC_STATS_URL = `http://${MAIN_PC_IP}:8000/api/youtube-stats`;
@@ -186,14 +189,26 @@
         if (tabName === 'stats') { loadChannelAnalytics(); }
     }
 
-    // 🎬 OBSの実際のシーン一覧を動的に描画するビルダー
+    // 🎬 OBSの実際のシーン一覧を動的に描画するビルダー（並び順反転＆ハイド機能搭載）
     function renderObsScenes(scenes, currentScene) {
         const container = document.getElementById('obs-scenes-container');
         if (!scenes || scenes.length === 0) {
             container.innerHTML = '<div class="user-text" style="grid-column: span 2; text-align:center; color:rgba(255,170,68,0.4);">OBSがオフライン、またはシーンがありません。</div>';
             return;
         }
-        container.innerHTML = scenes.map(name => {
+
+        // ① OBSの下から順になっている配列を反転させて「上からの順」にする
+        // ② HIDE_SCENESに登録された不要なシーンを弾く
+        const filteredScenes = [...scenes]
+            .reverse()
+            .filter(name => !HIDE_SCENES.includes(name));
+
+        if (filteredScenes.length === 0) {
+            container.innerHTML = '<div class="user-text" style="grid-column: span 2; text-align:center; color:rgba(255,170,68,0.4);">表示可能なシーンがありません。</div>';
+            return;
+        }
+
+        container.innerHTML = filteredScenes.map(name => {
             const isActive = (name === currentScene);
             const activeStyle = isActive ? 'style="background: rgba(85,255,85,0.08) !important; border-color: #55ff55 !important; color: #55ff55 !important; text-shadow: 0 0 6px rgba(85,255,85,0.4);"' : '';
             return `
@@ -205,7 +220,14 @@
         }).join('');
     }
 
+    // 🔁 OBSシーン切り替え発射関数（ボタンを押した瞬間に光る超高速・楽観的UI版）
     function triggerSceneSwitch(sceneName) {
+        // ⚡ 【体感ラグ完全ゼロ化】PCの応答（2.5秒周期）を待たずに、押されたスイッチをその場で即座に「緑色（点灯）」に変える
+        if (cachedData) {
+            cachedData.current_scene = sceneName;
+            renderObsScenes(cachedData.obs_scenes, sceneName);
+        }
+
         fetch(PC_SCENE_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -371,68 +393,47 @@
         }).catch(err => { alert("通信失敗: " + err); targetBtn.innerText = originalText; });
     }
 
-    // 🚀 【爆速タイムアウト＆2系統自動選別ルーター】
+    // 🚀 【完全二重化】PC代行 ➔ スマホ緊急公式チャット射出
     function sendEmergencyChat(broadcastId, chatId, btn) {
         const txtInput = document.getElementById(`chatmsg-${broadcastId}`); const msg = txtInput.value.trim();
         if(!msg || !chatId || chatId === "null" || chatId === "") { alert("エラー: 有効なチャットIDが見つかりません。"); return; }
         const orig = btn.innerText; btn.innerText = ".."; btn.disabled = true;
         
-        // ⏱️ PCの反応を最大1.5秒だけ待つためのタイマーコントローラー
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 1500);
 
-        // 🟢 【ルートA】PC代行ルートをまず急襲（1.5秒で見切る爆速設計）
+        // 🟢 【ルートA】PC代行ルートをまず急襲（CORS制限を完全回避して1.5秒で見切る）
         fetch(`http://${MAIN_PC_IP}:8000/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chat_id: chatId, message: msg }),
-            signal: controller.signal // 👈 タイムアウト信号を紐付け
+            signal: controller.signal
         })
         .then(res => {
-            clearTimeout(timeoutId); // 1.5秒以内に反応があったのでタイマー解除
+            clearTimeout(timeoutId);
             if (res.ok) {
                 return res.json().then(d => {
                     if(d.success) {
-                        txtInput.value = ''; alert("🚀 【PC代行ルート】チャット投稿に成功しました！");
+                        txtInput.value = ''; 
+                        alert("🚀 【PC代行ルート】チャット投稿に成功しました！");
                         btn.innerText = orig; btn.disabled = false;
                     } else { throw new Error(d.error || "PC側のAPIエラー"); }
                 });
-            } else { throw new Error("PC側サーバーエラー"); }
+            } else { throw new Error("PCオフライン"); }
         })
         .catch(err => {
             clearTimeout(timeoutId);
-            // 🚨 【ルートB】PC接続切れ、または1.5秒以内に返事がない場合は瞬時にここへ緊急スイッチ！
-            console.log("PCルートを断念。スマホ単独直撃ルートへフォールバックします:", err.message);
+            btn.innerText = orig; btn.disabled = false;
             
-            const token = localStorage.getItem("cached_yt_token");
-            if(!token) { 
-                alert("❌ PC代行が失敗し、スマホ内に通行証(token)がないため投稿できません。"); 
-                btn.innerText = orig; btn.disabled = false; return; 
+            // 🚨 【ルートB：緊急フォールバック】PCが死んでいる、または1.5秒以内に返事がない場合
+            // セキュリティブロックを100%回避するため、その配信枠の「公式チャット画面」を別タブで爆速召喚！
+            console.log("PCルートを断念。緊急の公式チャットリンクを展開します:", err.message);
+            
+            if (confirm("⚠️ 【PCオフライン検知】\nスマホからの直接API投稿はGoogleの制限で遮断されるため、この配信枠の【公式チャット画面】を直接開いて投稿します。よろしいですか？")) {
+                // 配信枠のVideo ID（broadcastId）を使い、公式の軽量チャット入力ページをダイレクト起動
+                window.open(`https://www.youtube.com/live_chat?v=${broadcastId}`, '_blank');
+                txtInput.value = ''; 
             }
-            
-            fetch("https://www.googleapis.com/youtube/v3/liveChatMessages?part=snippet", {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    snippet: {
-                        liveChatId: chatId,
-                        type: "textMessageEvent",
-                        textMessageDetails: { messageText: msg }
-                    }
-                })
-            })
-            .then(res => {
-                btn.innerText = orig; btn.disabled = false;
-                if(res.ok) { txtInput.value = ''; alert("📱 【スマホ緊急直撃】チャット投稿に成功しました！"); }
-                else { 
-                    return res.json().then(errData => {
-                        const errMsg = errData.error ? errData.error.message : "ステータスエラー";
-                        // ※Googleの仕様上、枠が完全に「LIVE中」でないとチャット投稿は400/403エラーになります
-                        alert(`❌ 投稿失敗（※枠がLIVE中でのみ投稿可能です）\nGoogleエラー詳細:\n${errMsg}`);
-                    });
-                }
-            })
-            .catch(err => { alert("通信エラー: " + err); btn.innerText = orig; btn.disabled = false; });
         });
     }
 
