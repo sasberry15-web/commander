@@ -37,7 +37,7 @@
         
         .mic-alert-box { background: rgba(255, 136, 0, 0.01); border: 1px solid rgba(255, 136, 0, 0.1); color: #ffaa44; padding: 14px; text-align: center; font-size: 14px; font-weight: bold; border-radius: 6px; margin-bottom: 18px; letter-spacing: 1px; transition: all 0.2s ease; text-shadow: 0 0 4px rgba(255, 136, 0, 0.2); cursor: pointer; }
         .mic-alert-box.active { background: rgba(85, 255, 85, 0.02) !important; border-color: rgba(85, 255, 85, 0.25) !important; color: #55ff55 !important; text-shadow: 0 0 6px rgba(85, 255, 85, 0.4) !important; }
-        .mic-alert-box.mute { background: rgba(255, 255, 0, 0.04) !important; border-color: rgba(255, 255,  yellow) !important; color: #ffff00 !important; text-shadow: 0 0 8px rgba(255, 255, 0, 0.5) !important; }
+        .mic-alert-box.mute { background: rgba(255, 255, 0, 0.04) !important; border-color: rgba(255, 255, 0, 0.6) !important; color: #ffff00 !important; text-shadow: 0 0 8px rgba(255, 255, 0, 0.5) !important; }
         .mic-alert-box.silent { background: rgba(255, 68, 68, 0.06) !important; border-color: #ff4444 !important; color: #ff4444 !important; text-shadow: 0 0 8px rgba(255, 68, 68, 0.5) !important; animation: mic-blink 1s infinite; }
         
         .toggle-switch-zone { display: flex; align-items: center; justify-content: center; padding: 0 2px; }
@@ -97,6 +97,10 @@
     </style>
 </head>
 <body>
+
+    <video id="no-sleep-video" loop playsinline muted autoplay style="position:fixed; top:0; left:0; width:1px; height:1px; opacity:0.01; pointer-events:none; z-index:-1000;">
+        <source src="data:video/mp4;base64,AAAAIGZ0eXBtcDQyAAAAAG1wNDJpc29tYXZjMQBtcDQyAAAAH21vb3YAAABsbXZoZAAAAABfS8pYX0vKWAAB9AAAAdwAAQAAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAACAdHJhawAAXHRraGQAAAADX0vKWF9LylgAAAABAAAAAAAB3AAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAABtZWRpYQAAACBtZGhkAAAAAF9LylhfS8pYAAH0AAAAdwBVY2gAAAAAACloZGxyAAAAAAAAAAB2aWRlbwAAAAAAAAAAAAAAAFZpZGVvTWVkaWEAAAAAVW1pbmYAAAAUdm1oZAAAAAAAQAAAQQAAAAgAc3RibAAAAGZzdHNkAAAAAAAAAAEAAABWYXZjMQAAAAAAAAAAAAAAAAAAAAgACABIAAAASAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGP//AAAARWF2Y0MBbYAKbP/hABhnY0AKbEAhsBAgAAMAAgAAAwB9AAfJgAEABW1kYXQAAAAYR2WeAAMwGQYExv//739fS8pYX0vKWAAAABhkaW5mAAAAEGRyZWYAAAAAAAAAAQAAAAxtdXJsAAAAAQAAAEZzdHRzAAAAAAAAAAEAAAABAAABAAAAAABzdHNjAAAAAAAAAAEAAAABAAAAAQAAAAEAAAAAc3RzeiAAAAAAAAAAAAAAAQAAABgAAAAAc3RjbwAAAAAAAAABAAAAMAAAADdidWRhAAAAKm1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXIAAAAAAAAAAAAAAAAAAAAAAAAAY2lsc3QAAAA=" type="video/mp4">
+    </video>
 
     <div class="dashboard-nav">
         <div class="nav-tab active-tab" id="tab-btn-status" onclick="switchTab('status')">📊 配信監視</div>
@@ -425,7 +429,7 @@
         });
     }
 
-    // ⚡ 【核心大修正：サルベージマージ方式】Googleの必須項目(enableMonitorStream等)を完全破壊せず引き継ぐ防衛回路
+    // ⚡ 【最重要核心パッチ：遅延設定干渉バグの完全破砕】
     function pushYouTubeUpdate(broadcastId, status, scheduledStartTime, targetBtn) {
         const titleVal = document.getElementById(`title-${broadcastId}`).value;
         const privacyVal = document.getElementById(`privacy-${broadcastId}`).value;
@@ -439,7 +443,7 @@
         
         const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
         
-        // ① 先に現在の設定情報（snippet, status, contentDetailsすべて）を丸ごとGoogleから引き抜く
+        // ① 先に現在の全設定パケットを引き抜く
         fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts?id=${broadcastId}&part=snippet,status,contentDetails`, { headers })
         .then(res => {
             if(!res.ok) throw new Error("既存設定のサルベージに失敗しました。");
@@ -448,16 +452,23 @@
         .then(getRes => {
             if(!getRes.items || getRes.items.length === 0) throw new Error("対象の配信枠がGoogle上で見つかりません。");
             
-            // ② Google側に保管されている必須項目（enableMonitorStream等）を含んだ完全体のオブジェクトをベースにする
             let bodyObj = getRes.items[0];
             
-            // ③ 変更したい値だけをピンポイントでマージ（上書き）する
+            // ② 変更したい値をマージ
             bodyObj.snippet.title = titleVal;
             bodyObj.status.privacyStatus = privacyVal;
             
             let partStr = "snippet,status,contentDetails";
             
-            // DVRの変更は「LIVE化する前(upcoming)」のみパケットのオブジェクト内に仕込む
+            // 🛠️ 【今回のバグの急所】
+            // contentDetailsの中にlatencyPreference(遅延設定)が入ったままPUTすると、
+            // Googleが「他のオプションと同時に更新できない」とエラー(Latency preference not supported...)を吐く絶対ルールがあります。
+            // そのため、サルベージしたデータからlatencyPreferenceを完全に抹殺(除外)します。
+            if (bodyObj.contentDetails && bodyObj.contentDetails.latencyPreference) {
+                delete bodyObj.contentDetails.latencyPreference;
+            }
+            
+            // DVRの変更は「LIVE化する前(upcoming)」のみ仕込む
             if (status !== "live") {
                 if(!bodyObj.contentDetails) bodyObj.contentDetails = {};
                 bodyObj.contentDetails.enableDvr = (dvrVal === "true");
@@ -465,7 +476,7 @@
             
             targetBtn.innerText = "⏳ Google Cloudへ反映中...";
             
-            // ④ 完全体になったオブジェクトをGoogleへPUT（設定送信）
+            // ③ latencyPreferenceを排除したクリーンな完全体オブジェクトでPUT送信
             return fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts?part=${partStr}`, {
                 method: 'PUT',
                 headers: headers,
@@ -646,7 +657,7 @@
         if (!cachedData) return;
         const alertBox = document.getElementById('mic-alert'); alertBox.className = "mic-alert-box " + cachedData.obs_status_class; alertBox.innerText = cachedData.obs_status_text;
         if (currentPC === 'main') {
-            document.getElementById('cpu-val').innerText = cachedData.cpu + '%'; document.getElementById('cpu-bar').style.width = cachedData.cpu + '%'; document.getElementById('cpu-temp-val').innerText = cachedData.cpu_temp + '°C'; document.getElementById('sys-ram-val').innerText = cachedClass = cachedData.sys_ram + 'GB';
+            document.getElementById('cpu-val').innerText = cachedData.cpu + '%'; document.getElementById('cpu-bar').style.width = cachedData.cpu + '%'; document.getElementById('cpu-temp-val').innerText = cachedData.cpu_temp + '°C'; document.getElementById('sys-ram-val').innerText = cachedData.sys_ram + 'GB';
             document.getElementById('gpu-val').innerText = cachedData.gpu + '%'; document.getElementById('gpu-bar').style.width = cachedData.gpu + '%'; document.getElementById('cpu-power-val').innerText = cachedData.cpu_power + 'W'; document.getElementById('gpu-vram-val').innerText = cachedData.gpu_vram + 'GB';
         } else {
             document.getElementById('cpu-val').innerText = cachedData.sub_cpu + '%'; document.getElementById('cpu-bar').style.width = cachedData.sub_cpu + '%'; document.getElementById('cpu-temp-val').innerText = (cachedData.sub_cpu_temp > 0 ? cachedData.sub_cpu_temp : '--') + '°C'; document.getElementById('sys-ram-val').innerText = cachedData.sub_sys_ram + 'GB';
