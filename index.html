@@ -83,12 +83,11 @@
         .net-offline { background: rgba(255, 68, 68, 0.15); color: #ff4444; border: 1px solid #ff4444; }
         .scheduled-time-zone { font-size: 12px; color: #00ffff; font-family: 'Courier New', monospace; font-weight: bold; margin-bottom: 10px; background: rgba(0,255,255,0.04); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(0,255,255,0.15); display: inline-block; }
 
-        /* OBS Scene Styles */
-        .obs-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px; }
-        .obs-btn-card { background: #000; border: 1px solid rgba(255,170,68,0.25); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
-        .obs-input { background: #111; border: 1px solid rgba(255,170,68,0.15); color: #fff; font-size: 11px; padding: 4px; border-radius: 4px; width: 100%; text-align: center; -webkit-user-select: text; user-select: text; }
-        .obs-go-btn { background: rgba(255, 170, 68, 0.08); border: 1px solid #ffaa44; color: #ffaa44; padding: 6px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; text-align: center; }
-        .obs-go-btn:active { background: rgba(255, 170, 68, 0.2); }
+        /* OBS リアルタイムシーン UI */
+        .obs-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 18px; }
+        .obs-btn-card { background: #000; border: 1px solid rgba(255,170,68,0.15); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; }
+        .obs-go-btn { background: rgba(255, 170, 68, 0.02); border: 1px solid rgba(255, 170, 68, 0.2); color: rgba(255, 170, 68, 0.7); padding: 12px 6px; border-radius: 4px; font-size: 14px; font-weight: bold; cursor: pointer; text-align: center; transition: all 0.2s ease; }
+        .obs-go-btn:active { background: rgba(255, 170, 68, 0.1); }
     </style>
 </head>
 <body>
@@ -129,24 +128,9 @@
     </div>
 
     <div id="panel-control" class="tab-panel">
-        <div class="section-title"><span>OBSシーン切り替えコントロール</span></div>
-        <div class="obs-grid">
-            <div class="obs-btn-card">
-                <input type="text" class="obs-input" id="obs-s1-name" value="配信準備" onchange="saveSceneNames()">
-                <div class="obs-go-btn" onclick="triggerSceneSwitch('obs-s1-name')">🔁 転換</div>
-            </div>
-            <div class="obs-btn-card">
-                <input type="text" class="obs-input" id="obs-s2-name" value="ゲーム画面" onchange="saveSceneNames()">
-                <div class="obs-go-btn" onclick="triggerSceneSwitch('obs-s2-name')">🔁 転換</div>
-            </div>
-            <div class="obs-btn-card">
-                <input type="text" class="obs-input" id="obs-s3-name" value="雑談画面" onchange="saveSceneNames()">
-                <div class="obs-go-btn" onclick="triggerSceneSwitch('obs-s3-name')">🔁 転換</div>
-            </div>
-            <div class="obs-btn-card">
-                <input type="text" class="obs-input" id="obs-s4-name" value="配信終了" onchange="saveSceneNames()">
-                <div class="obs-go-btn" onclick="triggerSceneSwitch('obs-s4-name')">🔁 転換</div>
-            </div>
+        <div class="section-title"><span>OBSシーン切り替え（自動同期盤）</span></div>
+        <div class="obs-grid" id="obs-scenes-container">
+            <div class="user-text" style="grid-column: span 2; text-align:center; color:rgba(255,170,68,0.4);">OBSからシーン構成をロード中...</div>
         </div>
 
         <div class="section-title"><span>Google Cloud ダイレクト接続盤 <span id="net-badge-control" class="net-status-badge net-online">DIRECT ONLINE</span></span><button class="yt-btn" style="width:auto; padding:4px 10px; font-size:11px;" onclick="loadYouTubeBroadcasts()">🔄 枠更新</button></div>
@@ -168,13 +152,28 @@
     const PC_SCENE_URL = `http://${MAIN_PC_IP}:8000/api/obs-scene`;
 
     let currentPC = 'main'; let cachedData = null; let toggleTimeout = null; let activeTab = 'status';
+    let wakeLock = null;
 
+    // 📱 【新機能】画面の自動消灯（スリープ）を100%防止する防壁
+    async function requestWakeLock() {
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLock = await navigator.wakeLock.request('screen');
+            }
+        } catch (err) { console.log("WakeLock Error: " + err.message); }
+    }
+    
     function def_wakeUpPhoneShield() {
         const v = document.getElementById('no-sleep-video');
         if (v && v.paused) { v.play().catch(() => {}); }
+        requestWakeLock();
     }
     document.body.addEventListener('click', def_wakeUpPhoneShield, { once: false });
     document.body.addEventListener('touchstart', def_wakeUpPhoneShield, { once: false });
+    
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') { requestWakeLock(); }
+    });
 
     function switchTab(tabName) {
         activeTab = tabName;
@@ -183,33 +182,35 @@
         document.getElementById(`tab-btn-${tabName}`).classList.add('active-tab');
         document.getElementById(`panel-${tabName}`).classList.add('active-panel');
         triggerToggleLit(); def_wakeUpPhoneShield();
-        if (tabName === 'control') { loadYouTubeBroadcasts(); loadSavedSceneNames(); }
+        if (tabName === 'control') { loadYouTubeBroadcasts(); }
         if (tabName === 'stats') { loadChannelAnalytics(); }
     }
 
-    // 🕒 シーン名のLocalStorage保存・読み込み
-    function saveSceneNames() {
-        localStorage.setItem("obs_s1", document.getElementById('obs-s1-name').value);
-        localStorage.setItem("obs_s2", document.getElementById('obs-s2-name').value);
-        localStorage.setItem("obs_s3", document.getElementById('obs-s3-name').value);
-        localStorage.setItem("obs_s4", document.getElementById('obs-s4-name').value);
-    }
-    function loadSavedSceneNames() {
-        if(localStorage.getItem("obs_s1")) document.getElementById('obs-s1-name').value = localStorage.getItem("obs_s1");
-        if(localStorage.getItem("obs_s2")) document.getElementById('obs-s2-name').value = localStorage.getItem("obs_s2");
-        if(localStorage.getItem("obs_s3")) document.getElementById('obs-s3-name').value = localStorage.getItem("obs_s3");
-        if(localStorage.getItem("obs_s4")) document.getElementById('obs-s4-name').value = localStorage.getItem("obs_s4");
+    // 🎬 OBSの実際のシーン一覧を動的に描画するビルダー
+    function renderObsScenes(scenes, currentScene) {
+        const container = document.getElementById('obs-scenes-container');
+        if (!scenes || scenes.length === 0) {
+            container.innerHTML = '<div class="user-text" style="grid-column: span 2; text-align:center; color:rgba(255,170,68,0.4);">OBSがオフライン、またはシーンがありません。</div>';
+            return;
+        }
+        container.innerHTML = scenes.map(name => {
+            const isActive = (name === currentScene);
+            const activeStyle = isActive ? 'style="background: rgba(85,255,85,0.08) !important; border-color: #55ff55 !important; color: #55ff55 !important; text-shadow: 0 0 6px rgba(85,255,85,0.4);"' : '';
+            return `
+                <div class="obs-btn-card" ${isActive ? 'style="border-color:rgba(85,255,85,0.3);"' : ''}>
+                    <div class="obs-go-btn" ${activeStyle} onclick="triggerSceneSwitch('${name}')">
+                        ${isActive ? '🟢 ' : '🔁 '} ${name}
+                    </div>
+                </div>`;
+        }).join('');
     }
 
-    // 🔁 OBSシーン切り替え発射関数
-    function triggerSceneSwitch(inputId) {
-        const name = document.getElementById(inputId).value.trim();
-        if(!name) return;
+    function triggerSceneSwitch(sceneName) {
         fetch(PC_SCENE_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sceneName: name })
-        }).catch(() => { alert("PCへの接続に失敗しました。PCが起動しているか確認してください。"); });
+            body: JSON.stringify({ sceneName: sceneName })
+        }).catch(() => {});
     }
 
     function formatToJST(isoString) {
@@ -370,17 +371,13 @@
         }).catch(err => { alert("通信失敗: " + err); targetBtn.innerText = originalText; });
     }
 
-   // 🚀 【完全二重化】PC代行 ➔ スマホ直撃への全自動フォールバック回路
+    // 🚀 【2系統自動選別ルーター回路】PC代行 ➔ スマホ単独直撃
     function sendEmergencyChat(broadcastId, chatId, btn) {
-        const txtInput = document.getElementById(`chatmsg-${broadcastId}`); 
-        const msg = txtInput.value.trim();
-        if(!msg || !chatId || chatId === "null" || chatId === "") { 
-            alert("エラー: 有効なチャットIDが見つかりません。"); 
-            return; 
-        }
+        const txtInput = document.getElementById(`chatmsg-${broadcastId}`); const msg = txtInput.value.trim();
+        if(!msg || !chatId || chatId === "null" || chatId === "") { alert("エラー: 有効なチャットIDが見つかりません。"); return; }
         const orig = btn.innerText; btn.innerText = ".."; btn.disabled = true;
-
-        // 🔥 【ルートA】まずはPC代行ルートを突撃（CORSが起きず100%安全・高速）
+        
+        // 🟢 【ルートA】まずはPC代行ルートを突撃（CORS制限を完全回避）
         fetch(`http://${MAIN_PC_IP}:8000/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -391,25 +388,19 @@
                 return res.json().then(d => {
                     if(d.success) {
                         txtInput.value = ''; 
-                        alert("🚀 【PC代行ルート】公式チャットへ爆速投稿しました！");
+                        alert("🚀 【PC代行ルート】チャット投稿に成功しました！");
                         btn.innerText = orig; btn.disabled = false;
-                    } else {
-                        throw new Error(d.error || "PC側でのGoogleAPIエラー");
-                    }
+                    } else { throw new Error(d.error || "PC側のAPIエラー"); }
                 });
-            } else {
-                throw new Error("PCサーバー応答エラー");
-            }
+            } else { throw new Error("PCオフライン"); }
         })
         .catch(err => {
-            // 🚨 【ルートB】PCがオフライン、または直結Wi-Fiから外れている場合はスマホ単独直撃に自動スイッチ！
-            console.log("PCが応答しないため、スマホ単独直撃ルートへ緊急フォールバックします:", err);
-            
+            // 🚨 【ルートB】PC接続切れの時は、スマホ単独直撃ルートへ緊急スイッチ！
+            console.log("PC非稼働のため、スマホ直接ルートへ切り替えます:", err);
             const token = localStorage.getItem("cached_yt_token");
             if(!token) { 
-                alert("❌ PC代行が失敗し、スマホ内にも通行証(token)がないため投稿できません。"); 
-                btn.innerText = orig; btn.disabled = false; 
-                return; 
+                alert("❌ 通行証(token)がありません。"); 
+                btn.innerText = orig; btn.disabled = false; return; 
             }
             
             fetch("https://www.googleapis.com/youtube/v3/liveChatMessages?part=snippet", {
@@ -425,24 +416,18 @@
             })
             .then(res => {
                 btn.innerText = orig; btn.disabled = false;
-                if(res.ok) { 
-                    txtInput.value = ''; 
-                    alert("📱 【スマホ緊急直撃】Google Cloudへ直接投稿に成功しました！"); 
-                } else { 
+                if(res.ok) { txtInput.value = ''; alert("📱 【スマホ緊急直撃】チャット投稿に成功しました！"); }
+                else { 
                     return res.json().then(errData => {
-                        const errMsg = errData.error ? errData.error.message : "不明な制限エラー";
-                        alert(`❌ 両ルート完全失敗。\nGoogle拒絶エラー詳細:\n${errMsg}`);
+                        const errMsg = errData.error ? errData.error.message : "制限エラー";
+                        alert(`❌ 投稿失敗:\n${errMsg}`);
                     });
                 }
             })
-            .catch(e => { 
-                alert("通信エラー: 両方のルートへの到達に失敗しました。"); 
-                btn.innerText = orig; btn.disabled = false; 
-            });
+            .catch(err => { alert("通信エラー: " + err); btn.innerText = orig; btn.disabled = false; });
         });
     }
 
-        
     function forceEndBroadcast(broadcastId, btn) {
         if(!confirm("⚠️⚠️⚠️【超重大警告】⚠️⚠️⚠️\n本当に配信を強制終了してもよろしいですか？\nこの操作は絶対に取り消せません。")) return;
         const orig = btn.innerText; btn.innerText = "⏳ 配信終了中..."; btn.disabled = true;
@@ -513,6 +498,11 @@
                         <div class="an-val" style="color:#fff;">${d.an_28d_views.toLocaleString()}回</div>
                     </div>
                 </div>
+                <div class="analytics-grid" style="margin-bottom:20px; border-top:1px solid rgba(255,170,68,0.1); padding-top:15px;">
+                    <div class="an-card" style="border:none;"><div class="an-label">現在の登録者数</div><div class="an-val" style="font-size:16px;">${parseInt(d.subscribers).toLocaleString()}人</div></div>
+                    <div class="an-card" style="border:none;"><div class="an-label">累計再生回数</div><div class="an-val" style="font-size:16px;">${parseInt(d.total_views).toLocaleString()}回</div></div>
+                    <div class="an-card" style="border:none;"><div class="an-label">総公開動画数</div><div class="an-val" style="font-size:16px;">${parseInt(d.total_videos).toLocaleString()}本</div></div>
+                </div>
                 <div class="section-title"><span>直近アーカイブ通知表</span></div>
                 ${pastHtml || '<div class="user-text">アーカイブデータがありません</div>'}`;
         })
@@ -539,7 +529,6 @@
         triggerToggleLit(); renderStats();
     }
 
-    // 🔄 JSONデータ構造からコメントカード群を動的ビルドする超軽量ロジック
     function buildCommentListHtml(comments) {
         if(!comments || comments.length === 0) return '<div class="comment-card"><div class="user-text">コメントを待機中...</div></div>';
         return comments.map(c => {
@@ -571,6 +560,11 @@
         }
         document.getElementById('viewers-val').innerText = '👀 ' + cachedData.viewers; document.getElementById('likes-val').innerText = '👍 ' + cachedData.likes; 
         document.getElementById('comment-list-container').innerHTML = buildCommentListHtml(cachedData.comments_json);
+        
+        // 🎬 OBSから自動同期したシーン一覧をUIに反映
+        if (activeTab === 'control') {
+            renderObsScenes(cachedData.obs_scenes, cachedData.current_scene);
+        }
     }
 
     function updateDashboard() {
