@@ -83,11 +83,17 @@
         .net-offline { background: rgba(255, 68, 68, 0.15); color: #ff4444; border: 1px solid #ff4444; }
         .scheduled-time-zone { font-size: 12px; color: #00ffff; font-family: 'Courier New', monospace; font-weight: bold; margin-bottom: 10px; background: rgba(0,255,255,0.04); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(0,255,255,0.15); display: inline-block; }
 
-        /* OBS リアルタイムシーン UI */
-        .obs-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 18px; }
+        /* OBS シーン関連拡張スタイル */
+        .obs-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px; }
         .obs-btn-card { background: #000; border: 1px solid rgba(255,170,68,0.15); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; }
         .obs-go-btn { background: rgba(255, 170, 68, 0.02); border: 1px solid rgba(255, 170, 68, 0.2); color: rgba(255, 170, 68, 0.7); padding: 12px 6px; border-radius: 4px; font-size: 14px; font-weight: bold; cursor: pointer; text-align: center; transition: all 0.2s ease; }
         .obs-go-btn:active { background: rgba(255, 170, 68, 0.1); }
+        
+        /* 🛠️ シーンマネージャー窓の特別デザイン */
+        .scene-mgr-box { background: rgba(255,170,68,0.02); border: 1px solid rgba(255,170,68,0.15); border-radius: 6px; padding: 10px; margin-bottom: 18px; display: none; }
+        .scene-mgr-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
+        .scene-mgr-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #fff; background: #111; padding: 6px; border-radius: 4px; }
+        .scene-mgr-check { width: 16px; height: 16px; accent-color: #ffaa44; }
     </style>
 </head>
 <body>
@@ -128,7 +134,16 @@
     </div>
 
     <div id="panel-control" class="tab-panel">
-        <div class="section-title"><span>OBSシーン切り替え（自動同期盤）</span></div>
+        <div class="section-title">
+            <span>OBSシーン切り替え（自動同期盤）</span>
+            <button class="yt-btn" style="width:auto; padding:3px 8px; font-size:11px;" onclick="toggleSceneManagerWindow()">⚙️ 表示管理</button>
+        </div>
+        
+        <div class="scene-mgr-box" id="scene-manager-window">
+            <div style="font-size: 11px; color: rgba(255,170,68,0.6);">チェックを外したシーンをスマホ画面からハイドします（自動記憶）：</div>
+            <div class="scene-mgr-grid" id="scene-manager-checkboxes"></div>
+        </div>
+
         <div class="obs-grid" id="obs-scenes-container">
             <div class="user-text" style="grid-column: span 2; text-align:center; color:rgba(255,170,68,0.4);">OBSからシーン構成をロード中...</div>
         </div>
@@ -145,9 +160,6 @@
     <script>
     const MAIN_PC_IP = "192.168.10.103"; 
 
-        // 🙈 【設定】スマホ画面に表示したくない（ハイドしたい）OBSのシーン名をここに入れてください
-    const HIDE_SCENES = ["配信停止画面", "ソース確認用", "裏画面", "使わないシーン名"];
-
     const PC_DATA_URL = `http://${MAIN_PC_IP}:8000/api/data`;
     const PC_TOKEN_URL = `http://${MAIN_PC_IP}:8000/api/youtube-token`;
     const PC_STATS_URL = `http://${MAIN_PC_IP}:8000/api/youtube-stats`;
@@ -157,12 +169,10 @@
     let currentPC = 'main'; let cachedData = null; let toggleTimeout = null; let activeTab = 'status';
     let wakeLock = null;
 
-    // 📱 【新機能】画面の自動消灯（スリープ）を100%防止する防壁
+    // 📱 画面の自動消灯（スリープ）を100%防止する防壁
     async function requestWakeLock() {
         try {
-            if ('wakeLock' in navigator) {
-                wakeLock = await navigator.wakeLock.request('screen');
-            }
+            if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); }
         } catch (err) { console.log("WakeLock Error: " + err.message); }
     }
     
@@ -173,10 +183,7 @@
     }
     document.body.addEventListener('click', def_wakeUpPhoneShield, { once: false });
     document.body.addEventListener('touchstart', def_wakeUpPhoneShield, { once: false });
-    
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') { requestWakeLock(); }
-    });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { requestWakeLock(); } });
 
     function switchTab(tabName) {
         activeTab = tabName;
@@ -185,11 +192,55 @@
         document.getElementById(`tab-btn-${tabName}`).classList.add('active-tab');
         document.getElementById(`panel-${tabName}`).classList.add('active-panel');
         triggerToggleLit(); def_wakeUpPhoneShield();
-        if (tabName === 'control') { loadYouTubeBroadcasts(); }
+        if (tabName === 'control') { loadYouTubeBroadcasts(); updateSceneManagerUI(); }
         if (tabName === 'stats') { loadChannelAnalytics(); }
     }
 
-    // 🎬 OBSの実際のシーン一覧を動的に描画するビルダー（並び順反転＆ハイド機能搭載）
+    // ⚙️ 表示管理窓のトグル
+    function toggleSceneManagerWindow() {
+        const w = document.getElementById('scene-manager-window');
+        w.style.display = (w.style.display === 'block') ? 'none' : 'block';
+    }
+
+    // LocalStorageから非表示にするシーン名リストを取得
+    function getHiddenScenes() {
+        const data = localStorage.getItem("obs_hidden_scenes");
+        return data ? JSON.parse(data) : [];
+    }
+
+    // チェックボックスの状態変化を検知して保存・再描画
+    function onSceneCheckChange(sceneName, isChecked) {
+        let hiddenList = getHiddenScenes();
+        if (isChecked) {
+            hiddenList = hiddenList.filter(name => name !== sceneName); // 表示にする
+        } else {
+            if (!hiddenList.includes(sceneName)) hiddenList.push(sceneName); // 非表示リストに追加
+        }
+        localStorage.setItem("obs_hidden_scenes", JSON.stringify(hiddenList));
+        if (cachedData) renderObsScenes(cachedData.obs_scenes, cachedData.current_scene);
+    }
+
+    // 管理窓の中のチェックボックスリストを生成
+    function updateSceneManagerUI() {
+        if (!cachedData || !cachedData.obs_scenes) return;
+        const container = document.getElementById('scene-manager-checkboxes');
+        const hiddenList = getHiddenScenes();
+        
+        // 上からの並び（反転）で管理用チェックボックスを並べる
+        const sortedScenes = [...cachedData.obs_scenes].reverse();
+        
+        container.innerHTML = sortedScenes.map(name => {
+            const isChecked = !hiddenList.includes(name);
+            return `
+                <label class="scene-mgr-item">
+                    <input type="checkbox" class="scene-mgr-check" ${isChecked ? 'checked' : ''} onchange="onSceneCheckChange('${name}', this.checked)">
+                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</span>
+                </label>
+            `;
+        }).join('');
+    }
+
+    // 🎬 シーンUI描画（並び順上から・ポチポチ選んだハイド反映機能）
     function renderObsScenes(scenes, currentScene) {
         const container = document.getElementById('obs-scenes-container');
         if (!scenes || scenes.length === 0) {
@@ -197,14 +248,16 @@
             return;
         }
 
-        // ① OBSの下から順になっている配列を反転させて「上からの順」にする
-        // ② HIDE_SCENESに登録された不要なシーンを弾く
+        const hiddenList = getHiddenScenes();
+        
+        // ① 下からの順の配列を反転して「上からの順」にする
+        // ② ポチポチ選んでチェックを外した（隠した）シーンを弾く
         const filteredScenes = [...scenes]
             .reverse()
-            .filter(name => !HIDE_SCENES.includes(name));
+            .filter(name => !hiddenList.includes(name));
 
         if (filteredScenes.length === 0) {
-            container.innerHTML = '<div class="user-text" style="grid-column: span 2; text-align:center; color:rgba(255,170,68,0.4);">表示可能なシーンがありません。</div>';
+            container.innerHTML = '<div class="user-text" style="grid-column: span 2; text-align:center; color:rgba(255,170,68,0.4);">すべてのシーンが非表示設定になっています。</div>';
             return;
         }
 
@@ -220,14 +273,12 @@
         }).join('');
     }
 
-    // 🔁 OBSシーン切り替え発射関数（ボタンを押した瞬間に光る超高速・楽観的UI版）
+    // 🔁 OBSシーン切り替え発射（タップ即点灯の超高速・楽観的UI）
     function triggerSceneSwitch(sceneName) {
-        // ⚡ 【体感ラグ完全ゼロ化】PCの応答（2.5秒周期）を待たずに、押されたスイッチをその場で即座に「緑色（点灯）」に変える
         if (cachedData) {
             cachedData.current_scene = sceneName;
             renderObsScenes(cachedData.obs_scenes, sceneName);
         }
-
         fetch(PC_SCENE_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -252,7 +303,7 @@
     function proceedFetchBroadcasts(token) {
         const controlContainer = document.getElementById('yt-live-control-container');
         if(!token) {
-            controlContainer.innerHTML = '<div class="comment-card"><div class="user-text" style="color:#ff4444; text-align:center;">エラー: 通行証(token)がLocalStorageにありません。</div></div>';
+            controlContainer.innerHTML = '<div class="comment-card"><div class="user-text" style="color:#ff4444; text-align:center;">エラー: 通行証(token)がありません。</div></div>';
             return;
         }
         
@@ -393,7 +444,7 @@
         }).catch(err => { alert("通信失敗: " + err); targetBtn.innerText = originalText; });
     }
 
-    // 🚀 【完全二重化】PC代行 ➔ スマホ緊急公式チャット射出
+    // 🚀 【完全二重化】PC代行 ➔ スマホアプリ直撃フォールバック（ブランドアカウント対応版）
     function sendEmergencyChat(broadcastId, chatId, btn) {
         const txtInput = document.getElementById(`chatmsg-${broadcastId}`); const msg = txtInput.value.trim();
         if(!msg || !chatId || chatId === "null" || chatId === "") { alert("エラー: 有効なチャットIDが見つかりません。"); return; }
@@ -425,13 +476,14 @@
             clearTimeout(timeoutId);
             btn.innerText = orig; btn.disabled = false;
             
-            // 🚨 【ルートB：緊急フォールバック】PCが死んでいる、または1.5秒以内に返事がない場合
-            // セキュリティブロックを100%回避するため、その配信枠の「公式チャット画面」を別タブで爆速召喚！
-            console.log("PCルートを断念。緊急の公式チャットリンクを展開します:", err.message);
+            // 🚨 【ルートB：緊急フォールバック（ブランドアカウント完全対応版）】
+            // ブラウザのCORS制限とアカウント固定問題を両方殺すため、スマホの「YouTubeアプリ(Studio)」のライブ管理画面へ直接ジャンプさせる！
+            console.log("PCルートを断念。緊急の公式アプリ制御リンクを射出します:", err.message);
             
-            if (confirm("⚠️ 【PCオフライン検知】\nスマホからの直接API投稿はGoogleの制限で遮断されるため、この配信枠の【公式チャット画面】を直接開いて投稿します。よろしいですか？")) {
-                // 配信枠のVideo ID（broadcastId）を使い、公式の軽量チャット入力ページをダイレクト起動
-                window.open(`https://www.youtube.com/live_chat?v=${broadcastId}`, '_blank');
+            if (confirm("⚠️ 【PCオフライン確認】\nスマホ直接のAPI投稿はGoogleのセキュリティで遮断されるため、スマホの【YouTube公式アプリ】を直接立ち上げて配信主として投稿します。よろしいですか？")) {
+                // YouTubeアプリのライブ配信者用管理・チャット画面を強制起動するディープリンク
+                // アプリであれば、スマホ側でログインしているブランドアカウントが100%そのまま適用されます
+                window.open(`youtube://www.youtube.com/live_chat?v=${broadcastId}`, '_blank');
                 txtInput.value = ''; 
             }
         });
@@ -570,9 +622,13 @@
         document.getElementById('viewers-val').innerText = '👀 ' + cachedData.viewers; document.getElementById('likes-val').innerText = '👍 ' + cachedData.likes; 
         document.getElementById('comment-list-container').innerHTML = buildCommentListHtml(cachedData.comments_json);
         
-        // 🎬 OBSから自動同期したシーン一覧をUIに反映
         if (activeTab === 'control') {
             renderObsScenes(cachedData.obs_scenes, cachedData.current_scene);
+            // 🎬 シーン構成に変更があったときだけ管理用のチェックボックス群を裏で最新化
+            const checkboxCount = document.getElementById('scene-manager-checkboxes').children.length;
+            if (cachedData.obs_scenes && checkboxCount !== cachedData.obs_scenes.length) {
+                updateSceneManagerUI();
+            }
         }
     }
 
