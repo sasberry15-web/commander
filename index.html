@@ -37,7 +37,7 @@
         
         .mic-alert-box { background: rgba(255, 136, 0, 0.01); border: 1px solid rgba(255, 136, 0, 0.1); color: #ffaa44; padding: 14px; text-align: center; font-size: 14px; font-weight: bold; border-radius: 6px; margin-bottom: 18px; letter-spacing: 1px; transition: all 0.2s ease; text-shadow: 0 0 4px rgba(255, 136, 0, 0.2); cursor: pointer; }
         .mic-alert-box.active { background: rgba(85, 255, 85, 0.02) !important; border-color: rgba(85, 255, 85, 0.25) !important; color: #55ff55 !important; text-shadow: 0 0 6px rgba(85, 255, 85, 0.4) !important; }
-        .mic-alert-box.mute { background: rgba(255, 255, 0, 0.04) !important; border-color: rgba(255, 255, 0, 0.6) !important; color: #ffff00 !important; text-shadow: 0 0 8px rgba(255, 255, 0, 0.5) !important; }
+        .mic-alert-box.mute { background: rgba(255, 255, 0, 0.04) !important; border-color: rgba(255, 255,  yellow) !important; color: #ffff00 !important; text-shadow: 0 0 8px rgba(255, 255, 0, 0.5) !important; }
         .mic-alert-box.silent { background: rgba(255, 68, 68, 0.06) !important; border-color: #ff4444 !important; color: #ff4444 !important; text-shadow: 0 0 8px rgba(255, 68, 68, 0.5) !important; animation: mic-blink 1s infinite; }
         
         .toggle-switch-zone { display: flex; align-items: center; justify-content: center; padding: 0 2px; }
@@ -93,13 +93,10 @@
         .scene-mgr-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
         .scene-mgr-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #fff; background: #111; padding: 6px; border-radius: 4px; }
         .scene-mgr-check { width: 16px; height: 16px; accent-color: #ffaa44; }
+        .yt-select:disabled { opacity: 0.55 !important; background: #151515 !important; color: rgba(255,170,68,0.5) !important; border-color: rgba(255,170,68,0.1) !important; }
     </style>
 </head>
 <body>
-
-    <video id="no-sleep-video" loop playsinline muted autoplay style="position:fixed; top:0; left:0; width:1px; height:1px; opacity:0.01; pointer-events:none; z-index:-1000;">
-        <source src="data:video/mp4;base64,AAAAIGZ0eXBtcDQyAAAAAG1wNDJpc29tYXZjMQBtcDQyAAAAH21vb3YAAABsbXZoZAAAAABfS8pYX0vKWAAB9AAAAdwAAQAAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAACAdHJhawAAXHRraGQAAAADX0vKWF9LylgAAAABAAAAAAAB3AAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAABtZWRpYQAAACBtZGhkAAAAAF9LylhfS8pYAAH0AAAAdwBVY2gAAAAAACloZGxyAAAAAAAAAAB2aWRlbwAAAAAAAAAAAAAAAFZpZGVvTWVkaWEAAAAAVW1pbmYAAAAUdm1oZAAAAAAAQAAAQQAAAAgAc3RibAAAAGZzdHNkAAAAAAAAAAEAAABWYXZjMQAAAAAAAAAAAAAAAAAAAAgACABIAAAASAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGP//AAAARWF2Y0MBbYAKbP/hABhnY0AKbEAhsBAgAAMAAgAAAwB9AAfJgAEABW1kYXQAAAAYR2WeAAMwGQYExv//739fS8pYX0vKWAAAABhkaW5mAAAAEGRyZWYAAAAAAAAAAQAAAAxtdXJsAAAAAQAAAEZzdHRzAAAAAAAAAAEAAAABAAABAAAAAABzdHNjAAAAAAAAAAEAAAABAAAAAQAAAAEAAAAAc3RzeiAAAAAAAAAAAAAAAQAAABgAAAAAc3RjbwAAAAAAAAABAAAAMAAAADdidWRhAAAAKm1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXIAAAAAAAAAAAAAAAAAAAAAAAAAY2lsc3QAAAA=" type="video/mp4">
-    </video>
 
     <div class="dashboard-nav">
         <div class="nav-tab active-tab" id="tab-btn-status" onclick="switchTab('status')">📊 配信監視</div>
@@ -238,10 +235,6 @@
         if(activeTab === 'control') loadYouTubeBroadcasts();
         if(activeTab === 'stats') loadChannelAnalytics();
     }
-
-    style = document.createElement('style');
-    style.innerHTML = '.yt-select:disabled { opacity: 0.55 !important; background: #151515 !important; color: rgba(255,170,68,0.5) !important; border-color: rgba(255,170,68,0.1) !important; }';
-    document.head.appendChild(style);
 
     function toggleSceneManagerWindow() {
         const w = document.getElementById('scene-manager-window');
@@ -411,7 +404,7 @@
             controlContainer.innerHTML = liveHtml || '<div class="comment-card"><div class="user-text" style="text-align:center;">現在オンライン・待機中の配信枠はありません。1時間を超えた場合はPCを起動するか「鍵の再取得」をお試しください。</div></div>';
         })
         .catch(err => {
-            controlContainer.innerHTML = `<div class="comment-card"><div class="user-text" style="color:#ff4444; text-align:center;">通信遮断エラー（鍵の有効期限が切れた可能性があります。「鍵の再取得」を押してください）</div></div>`;
+            controlContainer.innerHTML = `<div class="comment-card"><div class="user-text" style="text-align:center;">通信遮断エラー（鍵の有効期限が切れた可能性があります。「鍵の再取得」を押してください）</div></div>`;
         });
     }
 
@@ -432,33 +425,52 @@
         });
     }
 
+    // ⚡ 【核心大修正：サルベージマージ方式】Googleの必須項目(enableMonitorStream等)を完全破壊せず引き継ぐ防衛回路
     function pushYouTubeUpdate(broadcastId, status, scheduledStartTime, targetBtn) {
         const titleVal = document.getElementById(`title-${broadcastId}`).value;
         const privacyVal = document.getElementById(`privacy-${broadcastId}`).value;
         const dvrVal = document.getElementById(`dvr-${broadcastId}`).value;
         const originalText = targetBtn.innerText;
         
-        targetBtn.innerText = "⏳ Google Cloudへ反映中..."; targetBtn.style.borderColor = "#ff4444"; targetBtn.style.color = "#ff4444"; def_wakeUpPhoneShield();
+        targetBtn.innerText = "⏳ 設定を完全サルベージ中..."; targetBtn.style.borderColor = "#ff4444"; targetBtn.style.color = "#ff4444"; def_wakeUpPhoneShield();
         
         const token = localStorage.getItem("cached_yt_token");
         if(!token) { alert("アクセストークンがありません。"); targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44"; return; }
         
-        let partStr = "snippet,status";
-        let bodyObj = { id: broadcastId, snippet: { title: titleVal }, status: { privacyStatus: privacyVal } };
-        if (scheduledStartTime && scheduledStartTime !== "" && scheduledStartTime !== "undefined") {
-            bodyObj.snippet.scheduledStartTime = scheduledStartTime;
-        }
+        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
         
-        // 🔒 【API仕様完全準拠】DVRの変更は「LIVE化する前(upcoming)」のみパケットに含める。LIVE中の場合は送信エラーになるため除外。
-        if (status !== "live") {
-            partStr += ",contentDetails";
-            bodyObj.contentDetails = { enableDvr: (dvrVal === "true") };
-        }
-        
-        fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts?part=${partStr}`, {
-            method: 'PUT',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(bodyObj)
+        // ① 先に現在の設定情報（snippet, status, contentDetailsすべて）を丸ごとGoogleから引き抜く
+        fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts?id=${broadcastId}&part=snippet,status,contentDetails`, { headers })
+        .then(res => {
+            if(!res.ok) throw new Error("既存設定のサルベージに失敗しました。");
+            return res.json();
+        })
+        .then(getRes => {
+            if(!getRes.items || getRes.items.length === 0) throw new Error("対象の配信枠がGoogle上で見つかりません。");
+            
+            // ② Google側に保管されている必須項目（enableMonitorStream等）を含んだ完全体のオブジェクトをベースにする
+            let bodyObj = getRes.items[0];
+            
+            // ③ 変更したい値だけをピンポイントでマージ（上書き）する
+            bodyObj.snippet.title = titleVal;
+            bodyObj.status.privacyStatus = privacyVal;
+            
+            let partStr = "snippet,status,contentDetails";
+            
+            // DVRの変更は「LIVE化する前(upcoming)」のみパケットのオブジェクト内に仕込む
+            if (status !== "live") {
+                if(!bodyObj.contentDetails) bodyObj.contentDetails = {};
+                bodyObj.contentDetails.enableDvr = (dvrVal === "true");
+            }
+            
+            targetBtn.innerText = "⏳ Google Cloudへ反映中...";
+            
+            // ④ 完全体になったオブジェクトをGoogleへPUT（設定送信）
+            return fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts?part=${partStr}`, {
+                method: 'PUT',
+                headers: headers,
+                body: JSON.stringify(bodyObj)
+            });
         })
         .then(res => {
             if(res.ok) {
@@ -466,11 +478,17 @@
                 setTimeout(() => { targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44"; targetBtn.style.color = "#ffaa44"; loadYouTubeBroadcasts(); }, 1500);
             } else {
                 return res.json().then(err => {
-                    alert("Google拒絶エラー: " + (err.error ? err.error.message : "反映失敗。1時間期限切れの可能性。"));
-                    targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44";
+                    alert("Google拒絶エラー: " + (err.error ? err.error.message : "反映失敗。"));
+                    targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44"; targetBtn.style.color = "#ffaa44";
                 });
             }
-        }).catch(err => { alert("通信失敗: " + err); targetBtn.innerText = originalText; });
+        })
+        .catch(err => { 
+            alert("通信失敗: " + err.message); 
+            targetBtn.innerText = originalText; 
+            targetBtn.style.borderColor = "#ffaa44";
+            targetBtn.style.color = "#ffaa44";
+        });
     }
 
     function sendEmergencyChat(broadcastId, chatId, btn) {
@@ -588,7 +606,7 @@
         })
         .catch(() => {
             if(sBadge) { sBadge.innerText = "OFFLINE (PC停止中)"; sBadge.className = "net-status-badge net-offline"; }
-            container.innerHTML = `<div class="comment-card"><div class="user-text" style="text-align:center; color:#ff4444;">PCオフラインのため取得できません。スマホ内蔵の鍵を使って「操作パネル」側を復旧させることは可能です。</div></div>`;
+            container.innerHTML = `<div class="comment-card"><div class="user-text" style="text-align:center; color:#ff4444;">PCオフラインのため取得できません。</div></div>`;
         });
     }
 
@@ -628,7 +646,7 @@
         if (!cachedData) return;
         const alertBox = document.getElementById('mic-alert'); alertBox.className = "mic-alert-box " + cachedData.obs_status_class; alertBox.innerText = cachedData.obs_status_text;
         if (currentPC === 'main') {
-            document.getElementById('cpu-val').innerText = cachedData.cpu + '%'; document.getElementById('cpu-bar').style.width = cachedData.cpu + '%'; document.getElementById('cpu-temp-val').innerText = cachedData.cpu_temp + '°C'; document.getElementById('sys-ram-val').innerText = cachedData.sys_ram + 'GB';
+            document.getElementById('cpu-val').innerText = cachedData.cpu + '%'; document.getElementById('cpu-bar').style.width = cachedData.cpu + '%'; document.getElementById('cpu-temp-val').innerText = cachedData.cpu_temp + '°C'; document.getElementById('sys-ram-val').innerText = cachedClass = cachedData.sys_ram + 'GB';
             document.getElementById('gpu-val').innerText = cachedData.gpu + '%'; document.getElementById('gpu-bar').style.width = cachedData.gpu + '%'; document.getElementById('cpu-power-val').innerText = cachedData.cpu_power + 'W'; document.getElementById('gpu-vram-val').innerText = cachedData.gpu_vram + 'GB';
         } else {
             document.getElementById('cpu-val').innerText = cachedData.sub_cpu + '%'; document.getElementById('cpu-bar').style.width = cachedData.sub_cpu + '%'; document.getElementById('cpu-temp-val').innerText = (cachedData.sub_cpu_temp > 0 ? cachedData.sub_cpu_temp : '--') + '°C'; document.getElementById('sys-ram-val').innerText = cachedData.sub_sys_ram + 'GB';
@@ -656,7 +674,6 @@
     }
     
     forceRenewTokenSilent();
-    
     updateDashboard();
     setInterval(updateDashboard, 2500);
     setInterval(forceRenewTokenSilent, 1800000);
