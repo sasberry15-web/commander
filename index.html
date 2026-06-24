@@ -444,16 +444,17 @@
         }).catch(err => { alert("通信失敗: " + err); targetBtn.innerText = originalText; });
     }
 
-    // 🚀 【完全二重化】PC代行 ➔ スマホアプリ直撃フォールバック（ブランドアカウント対応版）
+    // 🚀 【完全二重化】PC代行(5秒ゆとり化) ➔ スマホアプリ公式配信ページ直撃フォールバック
     function sendEmergencyChat(broadcastId, chatId, btn) {
         const txtInput = document.getElementById(`chatmsg-${broadcastId}`); const msg = txtInput.value.trim();
         if(!msg || !chatId || chatId === "null" || chatId === "") { alert("エラー: 有効なチャットIDが見つかりません。"); return; }
         const orig = btn.innerText; btn.innerText = ".."; btn.disabled = true;
         
+        // ⏱️ PCの処理（Google通信含む）をゆったり5秒待つためのタイマーコントローラー
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1500);
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 👈 1.5秒から5秒へ延長して誤判定を徹底ガード
 
-        // 🟢 【ルートA】PC代行ルートをまず急襲（CORS制限を完全回避して1.5秒で見切る）
+        // 🟢 【ルートA】PC代行ルートを突撃（CORS制限を完全回避）
         fetch(`http://${MAIN_PC_IP}:8000/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -461,7 +462,7 @@
             signal: controller.signal
         })
         .then(res => {
-            clearTimeout(timeoutId);
+            clearTimeout(timeoutId); // 5秒以内に反応があったのでタイマー解除
             if (res.ok) {
                 return res.json().then(d => {
                     if(d.success) {
@@ -470,20 +471,21 @@
                         btn.innerText = orig; btn.disabled = false;
                     } else { throw new Error(d.error || "PC側のAPIエラー"); }
                 });
-            } else { throw new Error("PCオフライン"); }
+            } else { throw new Error("PC側サーバーエラー"); }
         })
         .catch(err => {
             clearTimeout(timeoutId);
             btn.innerText = orig; btn.disabled = false;
             
             // 🚨 【ルートB：緊急フォールバック（ブランドアカウント完全対応版）】
-            // ブラウザのCORS制限とアカウント固定問題を両方殺すため、スマホの「YouTubeアプリ(Studio)」のライブ管理画面へ直接ジャンプさせる！
-            console.log("PCルートを断念。緊急の公式アプリ制御リンクを射出します:", err.message);
+            // アプリ側の解釈バグ（Text画面）とアカウント固定問題を両方解決するため、
+            // 該当配信枠の「公式視聴・待機ページURL」をスマホから直接展開します。
+            console.log("PCルート断念、またはタイムアウト。公式アプリリンクを展開します:", err.message);
             
-            if (confirm("⚠️ 【PCオフライン確認】\nスマホ直接のAPI投稿はGoogleのセキュリティで遮断されるため、スマホの【YouTube公式アプリ】を直接立ち上げて配信主として投稿します。よろしいですか？")) {
-                // YouTubeアプリのライブ配信者用管理・チャット画面を強制起動するディープリンク
-                // アプリであれば、スマホ側でログインしているブランドアカウントが100%そのまま適用されます
-                window.open(`youtube://www.youtube.com/live_chat?v=${broadcastId}`, '_blank');
+            if (confirm("⚠️ 【PC応答なし / タイムアウト】\nPC経由での投稿がタイムアウトしたか、PCがオフラインです。スマホの【YouTube公式アプリ】で配信ページを開き、配信主として直接チャットを投稿しますか？")) {
+                // プレースホルダーのバグを回避するため、動画・配信ページそのもののURLを開きます
+                // スマートフォン環境であれば、自動的にYouTube公式アプリが起動し、アプリ側でログイン・切り替えているブランドアカウントのまま安全にチャットが可能です
+                window.open(`https://www.youtube.com/watch?v=${broadcastId}`, '_blank');
                 txtInput.value = ''; 
             }
         });
