@@ -1018,7 +1018,7 @@
         // --- MAIN FFmpeg UI 更新 (PC選択状態に関わらず常時更新) ---
         const mStatus = cachedData.main_ffmpeg_status || "待機中";
         const mFileCount = cachedData.main_ffmpeg_file_count || 0;
-        document.getElementById('main-ff-status').innerText = mStatus + (mFileCount > 0 ? ` (${mFileCount}本目)` : '');
+        document.getElementById('main-ff-status').innerText = (mFileCount > 0 ? `${mFileCount}本目` : '');
         document.getElementById('main-ff-filename').innerText = cachedData.main_ffmpeg_filename || "--";
         document.getElementById('main-ff-time').innerText = cachedData.main_ffmpeg_time || "--:--:--";
         document.getElementById('main-ff-speed').innerText = cachedData.main_ffmpeg_speed || "--x";
@@ -1039,7 +1039,7 @@
             } else {
                 let cleanPct = mProg.toString().replace('%', '').trim();
                 mPctValue = parseFloat(cleanPct) || 0;
-                mDisplayProg = "処理中 " + cleanPct + "%";
+                mDisplayProg = cleanPct + "% 処理中";
             }
         }
         document.getElementById('main-ff-total-pct').innerText = mDisplayProg;
@@ -1048,7 +1048,7 @@
         // --- SUB FFmpeg UI 更新 (PC選択状態に関わらず常時更新) ---
         const sStatus = cachedData.sub_ffmpeg_status || cachedData.sub_status || "待機中";
         const sFileCount = cachedData.sub_ffmpeg_file_count || cachedData.file_count || 0;
-        document.getElementById('sub-ff-status').innerText = sStatus + (sFileCount > 0 ? ` (${sFileCount}本目)` : '');
+        document.getElementById('sub-ff-status').innerText = (sFileCount > 0 ? `［${sFileCount}本目］` : '');
         document.getElementById('sub-ff-filename').innerText = cachedData.sub_ffmpeg_filename || cachedData.filename || "--";
         document.getElementById('sub-ff-time').innerText = cachedData.sub_ffmpeg_time || cachedData.sub_time || "--:--:--";
         document.getElementById('sub-ff-speed').innerText = cachedData.sub_ffmpeg_speed || cachedData.speed || "--x";
@@ -1069,7 +1069,7 @@
             } else {
                 let cleanPct = sProg.toString().replace('%', '').trim();
                 sPctValue = parseFloat(cleanPct) || 0;
-                sDisplayProg = "処理中 " + cleanPct + "%";
+                sDisplayProg = cleanPct + "% 処理中";
             }
         }
         document.getElementById('sub-ff-total-pct').innerText = sDisplayProg;
