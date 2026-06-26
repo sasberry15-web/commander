@@ -431,60 +431,120 @@
                 }
             });
             
-            let liveHtml = '';
+            // 各配信枠のストリームヘルスを並行フェッチ
+            const streamPromises = [];
             uniqueBroadcasts.forEach(b => {
+                const streamId = b.contentDetails ? b.contentDetails.boundStreamId : null;
                 const status = b.status.lifeCycleStatus;
-                const isLive = (status === 'live');
-                const title = b.snippet.title;
-                const isVertical = title.includes("縦配信") || title.toLowerCase().includes("shorts");
-                const currentDvr = b.contentDetails ? b.contentDetails.enableDvr : true;
-                const scheduledStartTime = b.snippet.scheduledStartTime || "";
-                const liveChatId = b.snippet.liveChatId || "";
-                const jstTimeStr = formatToJST(scheduledStartTime);
-                const timeBadgeHtml = jstTimeStr ? `<div class="scheduled-time-zone">${jstTimeStr}</div>` : '';
-                
-                liveHtml += `
-                <div class="yt-broadcast-card">
-                    <span class="yt-tag ${isVertical?'vertical':'horizontal'}">${isVertical?'📱 縦配信枠':'🖥️ 横配信枠'}:${status.toUpperCase()}</span>
-                    ${timeBadgeHtml}
-                    <label class="yt-label">タイトル全文編集</label>
-                    <textarea class="yt-textarea" id="title-${b.id}" rows="2">${title}</textarea>
-                    <div class="dvr-row">
-                        <div style="font-size:13px; font-weight:bold;">公開設定:</div>
-                        <select class="yt-select dvr-select" id="privacy-${b.id}">
-                            <option value="public" ${b.status.privacyStatus==='public'?'selected':''}>🌐 公開</option>
-                            <option value="unlisted" ${b.status.privacyStatus==='unlisted'?'selected':''}>🔒 限定公開</option>
-                            <option value="private" ${b.status.privacyStatus==='private'?'selected':''}>⛔️ 非公開</option>
-                        </select>
-                    </div>
-                    
-                    <div class="dvr-row" style="border-color:${isLive?'rgba(255,68,68,0.2)':'rgba(85,255,85,0.2)'};">
-                        <div style="font-size:12px; font-weight:bold;">
-                            DVR (追っかけ再生):<br>
-                            <span style="font-size:10px; color:${isLive?'#ff4444':'#55ff55'}; font-weight:bold;">
-                                ${isLive?'🔴 LIVE中: 閲覧のみ（ロック中）':'🟢 待機枠: スマホから変更可能'}
-                            </span>
-                        </div>
-                        <select class="yt-select dvr-select" id="dvr-${b.id}" ${isLive?'disabled':''}>
-                            <option value="true" ${currentDvr===true?'selected':''}>🟢 許可 (ON)</option>
-                            <option value="false" ${currentDvr===false?'selected':''}>❌ 禁止 (OFF)</option>
-                        </select>
-                    </div>
-                    
-                    <button class="yt-btn" style="margin-bottom:15px; background:rgba(255,170,68,0.08);" onclick="pushYouTubeUpdate('${b.id}', '${status}', '${scheduledStartTime}', this)">⚡ YouTubeに設定を反映する</button>
-                    
-                    <label class="yt-label">チャット投稿</label>
-                    <div class="chat-input-zone">
-                        <input type="text" class="chat-txt" id="chatmsg-${b.id}" placeholder="スマホから直接投稿">
-                        <button class="chat-send-btn" onclick="sendEmergencyChat('${b.id}', '${liveChatId}', this)">送信</button>
-                    </div>
-                    <div class="danger-zone">
-                        <span class="yt-label" style="color:#ff4444;">💀 最終宣告ゾーン</span>
-                        <button class="yt-btn" style="border-color:#ff4444; color:#ff4444; background:rgba(255,68,68,0.05);" onclick="forceEndBroadcast('${b.id}', this)">🚨 配信を強制終了する</button>
-                    </div>
-                </div>`;
+                if (streamId && status === 'live') {
+                    const streamUrl = `https://www.googleapis.com/youtube/v3/liveStreams?part=status&id=${streamId}`;
+                    const p = fetch(streamUrl, { headers })
+                        .then(r => r.json())
+                        .then(streamData => {
+                            if (streamData.items && streamData.items.length > 0) {
+                                const statusObj = streamData.items[0].status || {};
+                                const health = statusObj.healthStatus ? statusObj.healthStatus.status : "unknown";
+                                const issues = statusObj.healthStatus ? (statusObj.healthStatus.configurationIssues || []) : [];
+                                const msg = issues.length > 0 ? issues[0].description : "正常に配信データを受信中（ビットレート良好）";
+                                return { broadcastId: b.id, health, msg };
+                            }
+                            return { broadcastId: b.id, health: "unknown", msg: "ストリーム情報を取得できませんでした" };
+                        })
+                        .catch(() => ({ broadcastId: b.id, health: "unknown", msg: "通信エラーによりストリームヘルス未確認" }));
+                    streamPromises.push(p);
+                }
             });
-            controlContainer.innerHTML = liveHtml || '<div class="comment-card"><div class="user-text" style="text-align:center;">現在オンライン・待機中の配信枠はありません。1時間を超えた場合はPCを起動するか「鍵更新」をお試しください。</div></div>';
+
+            return Promise.all(streamPromises).then(streamResults => {
+                const streamMap = {};
+                streamResults.forEach(r => {
+                    streamMap[r.broadcastId] = r;
+                });
+
+                let liveHtml = '';
+                uniqueBroadcasts.forEach(b => {
+                    const status = b.status.lifeCycleStatus;
+                    const isLive = (status === 'live');
+                    const title = b.snippet.title;
+                    const isVertical = title.includes("縦配信") || title.toLowerCase().includes("shorts");
+                    const currentDvr = b.contentDetails ? b.contentDetails.enableDvr : true;
+                    const scheduledStartTime = b.snippet.scheduledStartTime || "";
+                    const liveChatId = b.snippet.liveChatId || "";
+                    const jstTimeStr = formatToJST(scheduledStartTime);
+                    const timeBadgeHtml = jstTimeStr ? `<div class="scheduled-time-zone">${jstTimeStr}</div>` : '';
+                    
+                    // ストリームヘルスの表示ブロックを作成
+                    let healthHtml = '';
+                    if (isLive) {
+                        const hInfo = streamMap[b.id] || { health: "unknown", msg: "ストリームステータス取得中..." };
+                        const hMap = {
+                            "good": { text: "🟢 良好", color: "#55ff55", bg: "rgba(85,255,85,0.06)", border: "rgba(85,255,85,0.3)" },
+                            "fair": { text: "🟡 警告", color: "#ffff00", bg: "rgba(255,255,0,0.06)", border: "rgba(255,255,0,0.3)" },
+                            "poor": { text: "🔴 危険", color: "#ff4444", bg: "rgba(255,68,68,0.06)", border: "rgba(255,68,68,0.3)" },
+                            "bad": { text: "💀 崩壊", color: "#ff4444", bg: "rgba(255,68,68,0.12)", border: "#ff4444" }
+                        };
+                        const hStyle = hMap[hInfo.health] || { text: `⚪ ${hInfo.health.toUpperCase()}`, color: "#aaa", bg: "rgba(255,255,255,0.02)", border: "rgba(255,255,255,0.1)" };
+                        healthHtml = `
+                        <div style="background:${hStyle.bg}; border:1px solid ${hStyle.border}; border-radius:6px; padding:10px; margin-bottom:12px; font-size:12px;">
+                            <div style="font-weight:bold; color:#ffaa44; margin-bottom:4px; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;">📡 ストリーム状況</div>
+                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                                <span style="color:${hStyle.color}; font-weight:bold; font-size:13px;">${hStyle.text}</span>
+                            </div>
+                            <div style="color:rgba(255,255,255,0.7); line-height:1.4; font-size:11px;">状態: ${hInfo.msg}</div>
+                        </div>`;
+                    } else {
+                        healthHtml = `
+                        <div style="background:rgba(255,255,255,0.01); border:1px solid rgba(255,170,68,0.08); border-radius:6px; padding:8px; margin-bottom:12px; font-size:11px; color:rgba(255,170,68,0.4);">
+                            ⚪ 配信前の待機枠です。配信開始後にストリームヘルスを自動監視します。
+                        </div>`;
+                    }
+                    
+                    liveHtml += `
+                    <div class="yt-broadcast-card">
+                        <span class="yt-tag ${isVertical?'vertical':'horizontal'}">${isVertical?'📱 縦配信枠':'🖥️ 横配信枠'}:${status.toUpperCase()}</span>
+                        ${timeBadgeHtml}
+                        
+                        ${healthHtml}
+                        
+                        <label class="yt-label">タイトル全文編集</label>
+                        <textarea class="yt-textarea" id="title-${b.id}" rows="2">${title}</textarea>
+                        <div class="dvr-row">
+                            <div style="font-size:13px; font-weight:bold;">公開設定:</div>
+                            <select class="yt-select dvr-select" id="privacy-${b.id}">
+                                <option value="public" ${b.status.privacyStatus==='public'?'selected':''}>🌐 公開</option>
+                                <option value="unlisted" ${b.status.privacyStatus==='unlisted'?'selected':''}>🔒 限定公開</option>
+                                <option value="private" ${b.status.privacyStatus==='private'?'selected':''}>⛔️ 非公開</option>
+                            </select>
+                        </div>
+                        
+                        <div class="dvr-row" style="border-color:${isLive?'rgba(255,68,68,0.2)':'rgba(85,255,85,0.2)'};">
+                            <div style="font-size:12px; font-weight:bold;">
+                                DVR (追っかけ再生):<br>
+                                <span style="font-size:10px; color:${isLive?'#ff4444':'#55ff55'}; font-weight:bold;">
+                                    ${isLive?'🔴 LIVE中: 閲覧のみ（ロック中）':'🟢 待機枠: スマホから変更可能'}
+                                </span>
+                            </div>
+                            <select class="yt-select dvr-select" id="dvr-${b.id}" ${isLive?'disabled':''}>
+                                <option value="true" ${currentDvr===true?'selected':''}>🟢 許可 (ON)</option>
+                                <option value="false" ${currentDvr===false?'selected':''}>❌ 禁止 (OFF)</option>
+                            </select>
+                        </div>
+                        
+                        <button class="yt-btn" style="margin-bottom:15px; background:rgba(255,170,68,0.08);" onclick="pushYouTubeUpdate('${b.id}', '${status}', '${scheduledStartTime}', this)">⚡ YouTubeに設定を反映する</button>
+                        
+                        <label class="yt-label">チャット投稿</label>
+                        <div class="chat-input-zone">
+                            <input type="text" class="chat-txt" id="chatmsg-${b.id}" placeholder="スマホから直接投稿">
+                            <button class="chat-send-btn" onclick="sendEmergencyChat('${b.id}', '${liveChatId}', this)">送信</button>
+                        </div>
+                        <div class="danger-zone">
+                            <span class="yt-label" style="color:#ff4444;">💀 最終宣告ゾーン</span>
+                            <button class="yt-btn" style="border-color:#ff4444; color:#ff4444; background:rgba(255,68,68,0.05);" onclick="forceEndBroadcast('${b.id}', this)">🚨 配信を強制終了する</button>
+                        </div>
+                    </div>`;
+                });
+                controlContainer.innerHTML = liveHtml || '<div class="comment-card"><div class="user-text" style="text-align:center;">現在オンライン・待機中の配信枠はありません。1時間を超えた場合はPCを起動するか「鍵更新」をお試しください。</div></div>';
+            });
         })
         .catch(err => {
             controlContainer.innerHTML = `<div class="comment-card"><div class="user-text" style="text-align:center;">通信遮断エラー（鍵の有効期限が切れた可能性があります。「鍵更新」を押してください）</div></div>`;
@@ -643,10 +703,10 @@
                 pastHtml += `
                 <div class="yt-broadcast-card" style="border-color:rgba(255,170,68,0.1); background:rgba(255,170,68,0.01); padding:10px; margin-bottom:8px;">
                     <div style="font-size:12px; font-weight:bold; color:#fff; margin-bottom:6px;">🎬 ${v.title} <span style="font-size:10px; color:rgba(255,170,68,0.4); margin-left:6px;">(${v.date})</span></div>
-                    <div class="analytics-grid" style="margin-bottom:0; grid-template-columns: repeat(3, 1fr);">
-                        <div class="an-card" style="border:none; background:rgba(255,255,255,0.02); padding:4px;"><div class="an-label">総視聴数</div><div class="an-val" style="color:#fff; font-size:14px;">${parseInt(v.views).toLocaleString()}</div></div>
-                        <div class="an-card" style="border:none; background:rgba(255,255,255,0.02); padding:4px;"><div class="an-label">高評価</div><div class="an-val" style="color:#ff44aa; font-size:14px;">${parseInt(v.likes).toLocaleString()}</div></div>
-                        <div class="an-card" style="border:none; background:rgba(255,255,255,0.02); padding:4px;"><div class="an-label">コメント</div><div class="an-val" style="color:#00ffff; font-size:14px;">${parseInt(v.comments).toLocaleString()}</div></div>
+                    <div style="display: flex; justify-content: space-around; gap: 8px; margin-bottom: 0;">
+                        <div class="an-card" style="flex: 1; border:none; background:rgba(255,255,255,0.02); padding:4px;"><div class="an-label">総視聴数</div><div class="an-val" style="color:#fff; font-size:14px;">${parseInt(v.views).toLocaleString()}</div></div>
+                        <div class="an-card" style="flex: 1; border:none; background:rgba(255,255,255,0.02); padding:4px;"><div class="an-label">高評価</div><div class="an-val" style="color:#ff44aa; font-size:14px;">${parseInt(v.likes).toLocaleString()}</div></div>
+                        <div class="an-card" style="flex: 1; border:none; background:rgba(255,255,255,0.02); padding:4px;"><div class="an-label">コメント</div><div class="an-val" style="color:#00ffff; font-size:14px;">${parseInt(v.comments).toLocaleString()}</div></div>
                     </div>
                 </div>`;
             });
