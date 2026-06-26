@@ -6,6 +6,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Stream Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -384,13 +387,18 @@
         localStorage.setItem("dashboard_active_tab_v5", tabName);
     }
 
-    // ↔️ スマホ左右スワイプによるタブ移動（入力エリアをガード）
+    // ↔️ スマホ左右スワイプによるタブ移動（入力エリアをガード）およびマウスドラッグによるエミュレート
     let touchStartX = 0;
     let touchStartY = 0;
+    let isMouseDown = false;
     
     document.addEventListener('touchstart', (e) => {
         const activeElem = document.activeElement;
         if (activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA' || activeElem.isContentEditable)) {
+            return;
+        }
+        // タブボタンバー（スクロール可能なタブエリア）をスワイプした場合は、タブ切り替えをせずスクロールのみにする
+        if (e.target.closest('.dashboard-nav') || e.target.closest('#dashboard-nav-container') || e.target.closest('.nav-tab')) {
             return;
         }
         touchStartX = e.touches[0].clientX;
@@ -402,12 +410,46 @@
         if (activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA' || activeElem.isContentEditable)) {
             return;
         }
+        if (e.target.closest('.dashboard-nav') || e.target.closest('#dashboard-nav-container') || e.target.closest('.nav-tab')) {
+            return;
+        }
         
         const touchEndX = e.changedTouches[0].clientX;
         const touchEndY = e.changedTouches[0].clientY;
         
-        const diffX = touchEndX - touchStartX;
-        const diffY = touchEndY - touchStartY;
+        handleSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
+    }, { passive: true });
+
+    // 🖥️ マウスドラッグによるスワイプエミュレーション
+    document.addEventListener('mousedown', (e) => {
+        const activeElem = document.activeElement;
+        if (activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA' || activeElem.isContentEditable)) {
+            return;
+        }
+        if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select') || e.target.closest('a') || e.target.closest('.nav-tab')) {
+            return;
+        }
+        if (e.target.closest('.dashboard-nav') || e.target.closest('#dashboard-nav-container')) {
+            return;
+        }
+        touchStartX = e.clientX;
+        touchStartY = e.clientY;
+        isMouseDown = true;
+    });
+
+    document.addEventListener('mouseup', (e) => {
+        if (!isMouseDown) return;
+        isMouseDown = false;
+        
+        const mouseEndX = e.clientX;
+        const mouseEndY = e.clientY;
+        
+        handleSwipe(touchStartX, touchStartY, mouseEndX, mouseEndY);
+    });
+
+    function handleSwipe(startX, startY, endX, endY) {
+        const diffX = endX - startX;
+        const diffY = endY - startY;
         
         // 横方向へのしっかりしたスワイプ、かつ縦スクロール誤検知を防ぐ縦方向の許容値を定義
         if (Math.abs(diffX) > 85 && Math.abs(diffY) < 60) {
@@ -426,7 +468,7 @@
                 }
             }
         }
-    }, { passive: true });
+    }
 
     function forceRenewTokenSilent() {
         fetch(PC_TOKEN_URL)
@@ -986,9 +1028,21 @@
         if (mBr) { mBr = mBr.replace(new RegExp('kbits/s|kb/s|kbps|b/s', 'gi'), '').trim(); }
         document.getElementById('main-ff-bitrate').innerText = mBr ? mBr : '--';
         
-        const mProg = cachedData.main_ffmpeg_total_progress || "--";
-        document.getElementById('main-ff-total-pct').innerText = mProg;
-        let mPctValue = parseFloat(mProg) || 0;
+        let mProg = cachedData.main_ffmpeg_total_progress || "--";
+        let mPctValue = 0;
+        let mDisplayProg = mProg;
+
+        if (mProg !== "--") {
+            if (mProg === "処理中") {
+                mDisplayProg = "処理中";
+                mPctValue = 0;
+            } else {
+                let cleanPct = mProg.toString().replace('%', '').trim();
+                mPctValue = parseFloat(cleanPct) || 0;
+                mDisplayProg = "処理中 " + cleanPct + "%";
+            }
+        }
+        document.getElementById('main-ff-total-pct').innerText = mDisplayProg;
         document.getElementById('main-ff-progress-bar').style.width = mPctValue + '%';
 
         // --- SUB FFmpeg UI 更新 (PC選択状態に関わらず常時更新) ---
@@ -1004,9 +1058,21 @@
         if (sBr) { sBr = sBr.replace(new RegExp('kbits/s|kb/s|kbps|b/s', 'gi'), '').trim(); }
         document.getElementById('sub-ff-bitrate').innerText = sBr ? sBr : '--';
         
-        const sProg = cachedData.sub_ffmpeg_total_progress || cachedData.sub_total_progress || "--";
-        document.getElementById('sub-ff-total-pct').innerText = sProg;
-        let sPctValue = parseFloat(sProg) || 0;
+        let sProg = cachedData.sub_ffmpeg_total_progress || cachedData.sub_total_progress || "--";
+        let sPctValue = 0;
+        let sDisplayProg = sProg;
+
+        if (sProg !== "--") {
+            if (sProg === "処理中") {
+                sDisplayProg = "処理中";
+                sPctValue = 0;
+            } else {
+                let cleanPct = sProg.toString().replace('%', '').trim();
+                sPctValue = parseFloat(cleanPct) || 0;
+                sDisplayProg = "処理中 " + cleanPct + "%";
+            }
+        }
+        document.getElementById('sub-ff-total-pct').innerText = sDisplayProg;
         document.getElementById('sub-ff-progress-bar').style.width = sPctValue + '%';
 
         document.getElementById('viewers-val').innerText = '👀 ' + cachedData.viewers; document.getElementById('likes-val').innerText = '👍 ' + cachedData.likes; 
@@ -1022,6 +1088,51 @@
     // ==========================================================================
     // 🎛️ 【新規アドオン】マクロレンダリング回路＆コンソールPostMessage同期システム
     // ==========================================================================
+    function applyUiTheme(uiTheme) {
+        if (!uiTheme) return;
+        const accent = uiTheme.accent_color || "#ffaa44";
+        const bg = uiTheme.bg_color || "#0a0a0d";
+        const fontFamily = uiTheme.font_family || "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        const borderW = uiTheme.border_width || "1px";
+        const fontSize = uiTheme.font_size || "110%";
+
+        // CSS変数の適用
+        document.documentElement.style.setProperty('--macro-accent', accent);
+        document.body.style.backgroundColor = bg;
+        document.body.style.color = accent;
+        document.body.style.fontFamily = fontFamily;
+        document.body.style.fontSize = fontSize;
+
+        const micAlert = document.getElementById('mic-alert');
+        if (micAlert) {
+            micAlert.style.borderColor = accent;
+            micAlert.style.borderWidth = borderW;
+        }
+
+        document.querySelectorAll('.nav-tab').forEach(t => {
+            t.style.setProperty('--accent-color', accent);
+            if (t.classList.contains('active-tab')) {
+                t.style.borderColor = accent;
+            } else {
+                t.style.borderColor = 'rgba(255, 136, 0, 0.12)';
+            }
+            t.style.borderWidth = borderW;
+        });
+
+        document.querySelectorAll('.macro-btn').forEach(btn => {
+            if (btn.classList.contains('normal')) {
+                btn.style.borderColor = accent;
+                btn.style.borderWidth = borderW;
+            }
+            // マクロボタンの個別文字サイズ適用
+            if (uiTheme.macro_font_size) {
+                btn.style.fontSize = uiTheme.macro_font_size;
+            } else if (uiTheme.font_size) {
+                btn.style.fontSize = uiTheme.font_size;
+            }
+        });
+    }
+
     function renderMacroDeck(macros, uiTheme) {
         const mContainer = document.getElementById('macro-grid-container');
         if (!mContainer) return;
@@ -1046,7 +1157,9 @@
                     btn.style.borderStyle = 'solid';
                 }
                 
-                if (uiTheme && uiTheme.font_size) {
+                if (uiTheme && uiTheme.macro_font_size) {
+                    btn.style.fontSize = uiTheme.macro_font_size;
+                } else if (uiTheme && uiTheme.font_size) {
                     btn.style.fontSize = uiTheme.font_size;
                 }
                 
@@ -1064,12 +1177,17 @@
         }
     }
 
+    // コンソールからのリアルタイム編集データを一時記憶するバッファ
+    let latestConsoleSyncConfig = null;
+
     // 🔮 【天才的アイデアの核】コンソール画面からの「リアルタイム編集データ」を検知して最速で化けさせる受信窓口
     window.addEventListener('message', function(event) {
         // セキュリティ制限をくぐり抜け、コンソールから降ってきたConfigを直接解読
         if (event.data && event.data.type === 'CONSOLE_SYNC') {
             const config = event.data.config;
             if (config) {
+                latestConsoleSyncConfig = config; // 一時バッファに記憶してポーリングに負けないようにガード
+                
                 // タブ配置・順序のリアルタイム更新
                 if (config.tabs) {
                     renderTabs(config.tabs);
@@ -1077,15 +1195,7 @@
                 
                 // UIデザイン（アクセントカラーなど）のリアルタイムプレビュー変更
                 if (config.ui_theme) {
-                    document.body.style.color = config.ui_theme.accent_color;
-                    const micAlert = document.getElementById('mic-alert');
-                    if(micAlert) micAlert.style.borderColor = config.ui_theme.accent_color;
-                    // ナビゲーションの細いボーダー線や色の同期
-                    document.querySelectorAll('.nav-tab').forEach(t => {
-                        t.style.setProperty('--accent-color', config.ui_theme.accent_color);
-                        t.style.borderColor = config.ui_theme.accent_color;
-                        t.style.borderWidth = config.ui_theme.border_width;
-                    });
+                    applyUiTheme(config.ui_theme);
                 }
                 // マクロボタンのリアルタイムプレビュー生成
                 renderMacroDeck(config.macros, config.ui_theme);
@@ -1104,9 +1214,22 @@
         .then(response => response.json())
         .then(data => { 
             cachedData = data; 
-            renderTabs(data.tabs);
+            
+            // ポーリングによるデータ更新の際、コンソールで編集中の一時同期データがあればそちらを優先（巻き戻り防止）
+            let activeTabs = data.tabs;
+            let activeMacros = data.macros;
+            let activeUiTheme = data.ui_theme;
+            
+            if (latestConsoleSyncConfig) {
+                if (latestConsoleSyncConfig.tabs) activeTabs = latestConsoleSyncConfig.tabs;
+                if (latestConsoleSyncConfig.macros) activeMacros = latestConsoleSyncConfig.macros;
+                if (latestConsoleSyncConfig.ui_theme) activeUiTheme = latestConsoleSyncConfig.ui_theme;
+            }
+            
+            renderTabs(activeTabs);
             renderStats(); 
-            renderMacroDeck(data.macros, data.ui_theme);
+            renderMacroDeck(activeMacros, activeUiTheme);
+            applyUiTheme(activeUiTheme);
         })
         .catch(() => {
             document.getElementById('mic-alert').innerText = "🎙️ MIC: PC OFFLINE (接続切れ)";
@@ -1118,7 +1241,7 @@
     initAccordions();
     switchPC('main');
     updateDashboard();
-    setInterval(updateDashboard, 2500);
+    setInterval(updateDashboard, 1000);
     setInterval(forceRenewTokenSilent, 1800000);
     </script>
 </body>
