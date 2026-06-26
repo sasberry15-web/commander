@@ -9,17 +9,44 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            background-color: #000000;
+            background-color: #0a0a0d;
             color: #ffaa44;
-            font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'Hiragino Kaku Gothic ProN', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', 'Hiragino Kaku Gothic ProN', sans-serif;
             padding: 10px 15px 15px 15px;
             overflow-x: hidden;
             -webkit-user-select: none;
             user-select: none;
             font-size: 110% !important;
         }
-        .dashboard-nav { display: flex; gap: 8px; margin-bottom: 15px; border-bottom: 1px solid rgba(255, 170, 68, 0.15); padding-bottom: 8px; }
-        .nav-tab { flex: 1; background: #000000; border: 1px solid rgba(255, 136, 0, 0.12); color: rgba(255, 170, 68, 0.35); padding: 10px 4px; text-align: center; font-size: 13px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s ease; white-space: nowrap; }
+        .dashboard-nav {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 170, 68, 0.15);
+            padding-bottom: 8px;
+            overflow-x: auto;
+            white-space: nowrap;
+            scrollbar-width: none; /* Firefox非表示 */
+            -webkit-overflow-scrolling: touch; /* iOS慣性スクロール */
+        }
+        .dashboard-nav::-webkit-scrollbar {
+            display: none; /* Chrome/Safari非表示 */
+        }
+        .nav-tab {
+            flex: 1;
+            background: #000000;
+            border: 1px solid rgba(255, 136, 0, 0.12);
+            color: rgba(255, 170, 68, 0.35);
+            padding: 10px 14px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            display: inline-block;
+        }
         .nav-tab.active-tab { color: #ffaa44 !important; border-color: #ffaa44 !important; background: rgba(255, 136, 0, 0.04); text-shadow: 0 0 6px rgba(255, 170, 68, 0.5); }
         .tab-panel { display: none; }
         .tab-panel.active-panel { display: block; }
@@ -111,15 +138,58 @@
             font-size: 14px; 
             font-weight: bold; 
             padding: 14px; 
-            border-radius: 6px; 
+            border-radius: 8px; 
             cursor: pointer; 
-            transition: all 0.1s ease; 
+            transition: all 0.15s ease; 
             text-align: center; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.5); 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6); 
             overflow: hidden; 
             text-overflow: ellipsis; 
             white-space: nowrap; 
         }
+        
+        /* 危険度カラーごとのボタン装飾 */
+        .macro-btn.normal {
+            border-color: var(--macro-accent, #ffaa44);
+            color: #ffffff;
+            background: rgba(255, 170, 68, 0.01);
+        }
+        .macro-btn.normal:active {
+            background: var(--macro-accent, #ffaa44) !important;
+            color: #000000 !important;
+        }
+        
+        .macro-btn.danger {
+            border-color: #ff4444 !important;
+            color: #ffffff !important;
+            background: rgba(255, 68, 68, 0.08) !important;
+            box-shadow: inset 0 0 10px rgba(255, 68, 68, 0.05), 0 4px 12px rgba(0,0,0,0.6) !important;
+        }
+        .macro-btn.danger:active {
+            background: #ff4444 !important;
+            color: #ffffff !important;
+        }
+        
+        .macro-btn.warning {
+            border-color: #ffff00 !important;
+            color: #ffffff !important;
+            background: rgba(255, 255, 0, 0.05) !important;
+        }
+        .macro-btn.warning:active {
+            background: #ffff00 !important;
+            color: #000000 !important;
+        }
+        
+        .macro-btn.success {
+            border-color: #55ff55 !important;
+            color: #ffffff !important;
+            background: rgba(85, 255, 85, 0.05) !important;
+        }
+        .macro-btn.success:active {
+            background: #55ff55 !important;
+            color: #000000 !important;
+        }
+
         .macro-btn:active { 
             background: #ffaa44 !important; 
             color: #000000 !important; 
@@ -140,7 +210,7 @@
         <source src="data:video/mp4;base64,AAAAIGZ0eXBtcDQyAAAAAG1wNDJpc29tYXZjMQBtcDQyAAAAH21vb3YAAABsbXZoZAAAAABfS8pYX0vKWAAB9AAAAdwAAQAAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAACAdHJhawAAXHRraGQAAAADX0vKWF9LylgAAAABAAAAAAAB3AAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAABtZWRpYQAAACBtZGhkAAAAAF9LylhfS8pYAAH0AAAAdwBVY2gAAAAAACloZGxyAAAAAAAAAAB2aWRlbwAAAAAAAAAAAAAAAFZpZGVvTWVkaWEAAAAAVW1pbmYAAAAUdm1oZAAAAAAAQAAAQQAAAAgAc3RibAAAAGZzdHNkAAAAAAAAAAEAAABWYXZjMQAAAAAAAAAAAAAAAAAAAAgACABIAAAASAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGP//AAAARWF2Y0MBbYAKbP/hABhnY0AKbEAhsBAgAAMAAgAAAwB9AAfJgAEABW1kYXQAAAAYR2WeAAMwGQYExv//739fS8pYX0vKWAAAABhkaW5mAAAAEGRyZWYAAAAAAAAAAQAAAAxtdXJsAAAAAQAAAEZzdHRzAAAAAAAAAAEAAAABAAABAAAAAABzdHNjAAAAAAAAAAEAAAABAAAAAQAAAAEAAAAAc3RzeiAAAAAAAAAAAAAAAQAAABgAAAAAc3RjbwAAAAAAAAABAAAAMAAAADdidWRhAAAAKm1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXIAAAAAAAAAAAAAAAAAAAAAAAAAY2lsc3QAAAA=" type="video/mp4">
     </video>
 
-    <div class="dashboard-nav">
+    <div class="dashboard-nav" id="dashboard-nav-container">
         <div class="nav-tab active-tab" id="tab-btn-status" onclick="switchTab('status')">📊 配信監視</div>
         <div class="nav-tab" id="tab-btn-control" onclick="switchTab('control')">🎙️ ライブ操作</div>
         <div class="nav-tab" id="tab-btn-stats" onclick="switchTab('stats')">📈 チャンネル</div>
@@ -272,16 +342,91 @@
     document.body.addEventListener('touchstart', def_wakeUpPhoneShield, { once: false });
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { requestWakeLock(); } });
 
+    const TAB_INFO = {
+        "status": "📊 配信監視",
+        "control": "🎙️ ライブ操作",
+        "stats": "📈 チャンネル",
+        "macro": "🎛️ マクロ"
+    };
+
+    function renderTabs(tabs) {
+        const container = document.getElementById('dashboard-nav-container');
+        if (!container) return;
+        
+        const currentTabs = tabs || ["status", "control", "stats", "macro"];
+        container.innerHTML = "";
+        
+        currentTabs.forEach(tabId => {
+            const label = TAB_INFO[tabId] || tabId;
+            const tabDiv = document.createElement('div');
+            tabDiv.className = `nav-tab ${activeTab === tabId ? 'active-tab' : ''}`;
+            tabDiv.id = `tab-btn-${tabId}`;
+            tabDiv.innerText = label;
+            tabDiv.onclick = () => switchTab(tabId);
+            container.appendChild(tabDiv);
+        });
+    }
+
     function switchTab(tabName) {
         activeTab = tabName;
         document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active-tab'));
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active-panel'));
-        document.getElementById(`tab-btn-${tabName}`).classList.add('active-tab');
-        document.getElementById(`panel-${tabName}`).classList.add('active-panel');
+        
+        const tabBtn = document.getElementById(`tab-btn-${tabName}`);
+        if (tabBtn) tabBtn.classList.add('active-tab');
+        
+        const panel = document.getElementById(`panel-${tabName}`);
+        if (panel) panel.classList.add('active-panel');
+        
         triggerToggleLit(); def_wakeUpPhoneShield();
         if (tabName === 'control') { loadYouTubeBroadcasts(); updateSceneManagerUI(); }
         if (tabName === 'stats') { loadChannelAnalytics(); }
+        localStorage.setItem("dashboard_active_tab_v5", tabName);
     }
+
+    // ↔️ スマホ左右スワイプによるタブ移動（入力エリアをガード）
+    let touchStartX = 0;
+    let touchStartY = 0;
+    
+    document.addEventListener('touchstart', (e) => {
+        const activeElem = document.activeElement;
+        if (activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA' || activeElem.isContentEditable)) {
+            return;
+        }
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        const activeElem = document.activeElement;
+        if (activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA' || activeElem.isContentEditable)) {
+            return;
+        }
+        
+        const touchEndX = e.changedTouches[0].clientX;
+        const touchEndY = e.changedTouches[0].clientY;
+        
+        const diffX = touchEndX - touchStartX;
+        const diffY = touchEndY - touchStartY;
+        
+        // 横方向へのしっかりしたスワイプ、かつ縦スクロール誤検知を防ぐ縦方向の許容値を定義
+        if (Math.abs(diffX) > 85 && Math.abs(diffY) < 60) {
+            const tabs = cachedData && cachedData.tabs ? cachedData.tabs : ["status", "control", "stats", "macro"];
+            const currentIndex = tabs.indexOf(activeTab);
+            
+            if (currentIndex !== -1) {
+                if (diffX < 0) {
+                    // 左スワイプ -> 右のタブへ
+                    const nextIndex = (currentIndex + 1) % tabs.length;
+                    switchTab(tabs[nextIndex]);
+                } else {
+                    // 右スワイプ -> 左のタブへ
+                    const nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+                    switchTab(tabs[nextIndex]);
+                }
+            }
+        }
+    }, { passive: true });
 
     function forceRenewTokenSilent() {
         fetch(PC_TOKEN_URL)
@@ -891,14 +1036,18 @@
         if (macros && macros.length > 0) {
             macros.forEach(m => {
                 const btn = document.createElement('div');
-                btn.className = "macro-btn";
+                const colClass = m.color_class || 'normal';
+                btn.className = `macro-btn ${colClass}`;
                 btn.innerText = m.label;
                 
-                if (uiTheme) {
+                if (colClass === 'normal' && uiTheme) {
                     btn.style.borderColor = uiTheme.accent_color;
                     btn.style.borderWidth = uiTheme.border_width;
                     btn.style.borderStyle = 'solid';
-                    if(uiTheme.font_size) { btn.style.fontSize = uiTheme.font_size; }
+                }
+                
+                if (uiTheme && uiTheme.font_size) {
+                    btn.style.fontSize = uiTheme.font_size;
                 }
                 
                 // 🚀 マクロ実行APIへ直撃通信
@@ -921,6 +1070,11 @@
         if (event.data && event.data.type === 'CONSOLE_SYNC') {
             const config = event.data.config;
             if (config) {
+                // タブ配置・順序のリアルタイム更新
+                if (config.tabs) {
+                    renderTabs(config.tabs);
+                }
+                
                 // UIデザイン（アクセントカラーなど）のリアルタイムプレビュー変更
                 if (config.ui_theme) {
                     document.body.style.color = config.ui_theme.accent_color;
@@ -950,6 +1104,7 @@
         .then(response => response.json())
         .then(data => { 
             cachedData = data; 
+            renderTabs(data.tabs);
             renderStats(); 
             renderMacroDeck(data.macros, data.ui_theme);
         })
