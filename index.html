@@ -69,12 +69,12 @@
         .yt-btn:active { transform: scale(0.98); background: rgba(255, 136, 0, 0.15); }
         
         .chat-input-zone { display: flex; gap: 8px; margin-bottom: 12px; }
-        .chat-txt { flex: 1; background: #000; border: 1px solid rgba(255,170,68,0.3); border-radius: 6px; color: #fff; padding: 10px; font-size: 14px; -webkit-user-select: text; user-select: text; }
+        .chat-txt { flex: 1; background: #00; border: 1px solid rgba(255,170,68,0.3); border-radius: 6px; color: #fff; padding: 10px; font-size: 14px; -webkit-user-select: text; user-select: text; }
         .chat-send-btn { background: #ffaa44; color: #000; border: none; padding: 0 16px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 13px; }
         .danger-zone { border: 1px solid #ff4444 !important; background: rgba(255,68,68,0.02) !important; padding: 12px; border-radius: 6px; margin-top: 20px; }
         .dvr-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; background: rgba(255,255,255,0.01); padding: 8px; border-radius: 6px; border: 1px solid rgba(255,170,68,0.1); }
         .analytics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 15px; }
-        .an-card { background: #000; border: 1px solid rgba(255,170,68,0.15); border-radius: 6px; padding: 10px 4px; text-align: center; }
+        .an-card { background: #00; border: 1px solid rgba(255,170,68,0.15); border-radius: 6px; padding: 10px 4px; text-align: center; }
         .an-label { font-size: 11px; color: rgba(255,170,68,0.4); margin-bottom: 4px; }
         .an-val { font-size: 20px; font-weight: bold; font-family: 'Courier New', monospace; color: #ffaa44; }
         
@@ -85,7 +85,7 @@
 
         /* OBS シーン関連拡張スタイル */
         .obs-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px; }
-        .obs-btn-card { background: #000; border: 1px solid rgba(255,170,68,0.15); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; }
+        .obs-btn-card { background: #00; border: 1px solid rgba(255,170,68,0.15); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; }
         .obs-go-btn { background: rgba(255, 170, 68, 0.02); border: 1px solid rgba(255, 170, 68, 0.2); color: rgba(255, 170, 68, 0.7); padding: 12px 6px; border-radius: 4px; font-size: 14px; font-weight: bold; cursor: pointer; text-align: center; transition: all 0.2s ease; }
         .obs-go-btn:active { background: rgba(255, 170, 68, 0.1); }
         
@@ -94,6 +94,44 @@
         .scene-mgr-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #fff; background: #111; padding: 6px; border-radius: 4px; }
         .scene-mgr-check { width: 16px; height: 16px; accent-color: #ffaa44; }
         .yt-select:disabled { opacity: 0.55 !important; background: #151515 !important; color: rgba(255,170,68,0.5) !important; border-color: rgba(255,170,68,0.1) !important; }
+
+        /* ==========================================================================
+           🎛️ 【新規追加】マクロボタン専用拡張スタイル（既存のスタイルを1ミリも汚さない）
+           ========================================================================== */
+        .macro-grid { 
+            display: grid; 
+            grid-template-columns: repeat(2, 1fr); 
+            gap: 10px; 
+            margin-bottom: 15px; 
+        }
+        .macro-btn { 
+            background: #111111; 
+            border: 1px solid #ffaa44; 
+            color: #ffffff; 
+            font-size: 14px; 
+            font-weight: bold; 
+            padding: 14px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            transition: all 0.1s ease; 
+            text-align: center; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5); 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            white-space: nowrap; 
+        }
+        .macro-btn:active { 
+            background: #ffaa44 !important; 
+            color: #000000 !important; 
+        }
+        .ffmpeg-accordion-header {
+            background: rgba(255,170,68,0.02);
+            transition: background 0.2s;
+        }
+        .ffmpeg-accordion-header:active {
+            background: rgba(255,170,68,0.08);
+        }
+
     </style>
 </head>
 <body>
@@ -106,6 +144,7 @@
         <div class="nav-tab active-tab" id="tab-btn-status" onclick="switchTab('status')">📊 配信監視</div>
         <div class="nav-tab" id="tab-btn-control" onclick="switchTab('control')">🎙️ ライブ操作</div>
         <div class="nav-tab" id="tab-btn-stats" onclick="switchTab('stats')">📈 チャンネル</div>
+        <div class="nav-tab" id="tab-btn-macro" onclick="switchTab('macro')">🎛️ マクロ</div>
     </div>
 
     <div id="panel-status" class="tab-panel active-panel">
@@ -123,11 +162,38 @@
             </div>
         </div>
         <div class="mic-alert-box" id="mic-alert" onclick="toggleMicMute()">🎙️ MIC: 接続待機中...</div>
-        <div class="ffmpeg-panel" id="ffmpeg-panel">
-            <div class="ffmpeg-header"><span>🎬 全体進捗 <span id="ff-total-pct" style="margin-left: 8px; background: rgba(255,136,0,0.1); padding: 2px 8px; border-radius: 4px; color: #ffaa44; font-weight: bold; border: 1px solid rgba(255,136,0,0.2);">--</span></span><span id="ff-status" style="color: #ffaa44; font-weight: bold;">待機中</span></div>
-            <div class="ffmpeg-file">ファイル: <span id="ff-filename">--</span></div>
-            <div class="stats-bar" style="height: 4px; background: rgba(255, 170, 68, 0.02); margin-bottom: 12px; border-radius: 2px; overflow: hidden;"><div class="stat-fill" id="ff-progress-bar" style="width: 0%; height: 100%; background: #ffaa44; box-shadow: 0 0 6px #ffaa44; transition: width 0.4s ease;"></div></div>
-            <div class="ffmpeg-grid"><div>進捗: <span id="ff-time">--:--:--</span></div><div>速度: <span id="ff-speed">--x</span></div><div>ビットレート: <span id="ff-bitrate">--</span></div><div>経過: <span id="ff-elapsed">--:--:--</span></div></div>
+        <div class="ffmpeg-panel" id="ffmpeg-panel" style="padding: 6px; background: rgba(0,0,0,0.15); border: 1px solid rgba(255,170,68,0.08); border-radius: 8px; margin-top: 10px; display: none;">
+            <!-- 🖥️ MAIN PC FFmpeg Accordion -->
+            <div class="ffmpeg-accordion" style="border: 1px solid rgba(255, 170, 68, 0.15); border-radius: 6px; margin-bottom: 6px; overflow: hidden; background: rgba(0,0,0,0.2);">
+                <div class="ffmpeg-accordion-header" onclick="toggleAccordion('main-ffmpeg-body')" style="padding: 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;">
+                    <span style="font-weight: bold; font-size: 13px; color: #fff; display: flex; align-items: center; gap: 4px;">🖥️ MAIN FFmpeg [ <span id="main-ff-status" style="color: #ffaa44;">待機中</span> ]</span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span id="main-ff-total-pct" style="background: rgba(255,136,0,0.1); padding: 1px 6px; border-radius: 4px; color: #ffaa44; font-size: 11px; font-weight: bold; border: 1px solid rgba(255,136,0,0.2);">--%</span>
+                        <span id="main-ff-arrow" style="font-size: 10px; color: rgba(255,170,68,0.5); transition: transform 0.2s;">▼</span>
+                    </div>
+                </div>
+                <div id="main-ffmpeg-body" class="ffmpeg-accordion-body" style="padding: 10px; display: block; border-top: 1px solid rgba(255,170,68,0.1); background: rgba(0,0,0,0.1);">
+                    <div class="ffmpeg-file" style="font-size: 12px; margin-bottom: 6px; color: rgba(255,255,255,0.85); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ファイル: <span id="main-ff-filename">--</span></div>
+                    <div class="stats-bar" style="height: 4px; background: rgba(255, 170, 68, 0.02); margin-bottom: 12px; border-radius: 2px; overflow: hidden;"><div class="stat-fill" id="main-ff-progress-bar" style="width: 0%; height: 100%; background: #ffaa44; box-shadow: 0 0 6px #ffaa44; transition: width 0.4s ease;"></div></div>
+                    <div class="ffmpeg-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-size: 11px; color: rgba(255,255,255,0.65);"><div>進捗: <span id="main-ff-time" style="color: #fff; font-weight: 500;">--:--:--</span></div><div>速度: <span id="main-ff-speed" style="color: #fff; font-weight: 500;">--x</span></div><div>ビットレート: <span id="main-ff-bitrate" style="color: #fff; font-weight: 500;">--</span></div><div>経過: <span id="main-ff-elapsed" style="color: #fff; font-weight: 500;">--:--:--</span></div></div>
+                </div>
+            </div>
+
+            <!-- 📡 SUB PC FFmpeg Accordion -->
+            <div class="ffmpeg-accordion" style="border: 1px solid rgba(255, 170, 68, 0.15); border-radius: 6px; overflow: hidden; background: rgba(0,0,0,0.2);">
+                <div class="ffmpeg-accordion-header" onclick="toggleAccordion('sub-ffmpeg-body')" style="padding: 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;">
+                    <span style="font-weight: bold; font-size: 13px; color: #fff; display: flex; align-items: center; gap: 4px;">📡 SUB FFmpeg [ <span id="sub-ff-status" style="color: #ffaa44;">待機中</span> ]</span>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span id="sub-ff-total-pct" style="background: rgba(255,136,0,0.1); padding: 1px 6px; border-radius: 4px; color: #ffaa44; font-size: 11px; font-weight: bold; border: 1px solid rgba(255,136,0,0.2);">--%</span>
+                        <span id="sub-ff-arrow" style="font-size: 10px; color: rgba(255,170,68,0.5); transition: transform 0.2s;">▼</span>
+                    </div>
+                </div>
+                <div id="sub-ffmpeg-body" class="ffmpeg-accordion-body" style="padding: 10px; display: block; border-top: 1px solid rgba(255,170,68,0.1); background: rgba(0,0,0,0.1);">
+                    <div class="ffmpeg-file" style="font-size: 12px; margin-bottom: 6px; color: rgba(255,255,255,0.85); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ファイル: <span id="sub-ff-filename">--</span></div>
+                    <div class="stats-bar" style="height: 4px; background: rgba(255, 170, 68, 0.02); margin-bottom: 12px; border-radius: 2px; overflow: hidden;"><div class="stat-fill" id="sub-ff-progress-bar" style="width: 0%; height: 100%; background: #ffaa44; box-shadow: 0 0 6px #ffaa44; transition: width 0.4s ease;"></div></div>
+                    <div class="ffmpeg-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-size: 11px; color: rgba(255,255,255,0.65);"><div>進捗: <span id="sub-ff-time" style="color: #fff; font-weight: 500;">--:--:--</span></div><div>速度: <span id="sub-ff-speed" style="color: #fff; font-weight: 500;">--x</span></div><div>ビットレート: <span id="sub-ff-bitrate" style="color: #fff; font-weight: 500;">--</span></div><div>経過: <span id="sub-ff-elapsed" style="color: #fff; font-weight: 500;">--:--:--</span></div></div>
+                </div>
+            </div>
         </div>
         <div class="section-title"><span>コメント配信状況</span><div class="live-status"><span class="status-item" id="viewers-val" style="color: #ffaa44; text-shadow: 0 0 6px rgba(255,170,68,0.4);">👀 --</span><span class="status-item" id="likes-val" style="color: #ff44aa; border-color: rgba(255,68,170,0.08); text-shadow: 0 0 6px rgba(255,68,170,0.4);">👍 --</span></div></div>
         <div class="comment-list" id="comment-list-container"><div class="comment-card"><div class="user-text">PCからの信号を待機中...</div></div></div>
@@ -166,14 +232,27 @@
         <div id="yt-analytics-container">YouTube API サーバーから神データをハント中...</div>
     </div>
 
-    <script>
-    const MAIN_PC_IP = "192.168.10.103"; 
+    <div id="panel-macro" class="tab-panel">
+        <div class="section-title">🎛️ カスタム拡張マクロ (Macro Deck)</div>
+        <div class="macro-grid" id="macro-grid-container">
+        </div>
+    </div>
 
-    const PC_DATA_URL = `http://${MAIN_PC_IP}:8000/api/data`;
-    const PC_TOKEN_URL = `http://${MAIN_PC_IP}:8002/api/youtube-token`; // 👈 👑 【急所大修正】8000から8002へ完全修正！これで空振りが消滅します！
-    const PC_STATS_URL = `http://${MAIN_PC_IP}:8000/api/youtube-stats`;
-    const PC_MIC_URL = `http://${MAIN_PC_IP}:8000/api/toggle-mic`;
-    const PC_SCENE_URL = `http://${MAIN_PC_IP}:8000/api/obs-scene`;
+    <script>
+    // URL設定。ローカル実行時とプレビュー時を自動判定してフォールバック
+    const MAIN_PC_IP = "192.168.10.103"; 
+    const CURRENT_ORIGIN = window.location.origin;
+    
+    // APIサーバーのベースURLを自動解決。ローカルIP直撃の場合はPC_IPを使い、それ以外（ブラウザ自身からの相対パスなど）はoriginを使う
+    const API_BASE_URL = CURRENT_ORIGIN.includes("192.168.10.") || CURRENT_ORIGIN.includes("localhost") || CURRENT_ORIGIN.includes("127.0.0.1")
+        ? CURRENT_ORIGIN 
+        : `http://${MAIN_PC_IP}:8000`;
+
+    const PC_DATA_URL = `${API_BASE_URL}/api/data`;
+    const PC_TOKEN_URL = `http://${MAIN_PC_IP}:8002/api/youtube-token`; 
+    const PC_STATS_URL = `${API_BASE_URL}/api/youtube-stats`;
+    const PC_MIC_URL = `${API_BASE_URL}/api/toggle-mic`;
+    const PC_SCENE_URL = `${API_BASE_URL}/api/obs-scene`;
 
     let currentPC = 'main'; let cachedData = null; let toggleTimeout = null; let activeTab = 'status';
     let wakeLock = null;
@@ -448,7 +527,7 @@
             return res.json();
         })
         .then(getRes => {
-            if(!getRes.items || getRes.items.length === 0) throw new Error("対象の配信枠がGoogle上で見つかりません。");
+            if(!getRes.items || getRes.items.length === 0) throw new Error("対象 of 配信枠がGoogle上で見つかりません。");
             
             let bodyObj = getRes.items[0];
             bodyObj.snippet.title = titleVal;
@@ -500,7 +579,7 @@
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        fetch(`http://${MAIN_PC_IP}:8000/api/chat`, {
+        fetch(`${API_BASE_URL}/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chat_id: chatId, message: msg }),
@@ -620,8 +699,13 @@
     function togglePC() { if (currentPC === 'main') { switchPC('sub'); } else { switchPC('main'); } }
     function switchPC(target) {
         currentPC = target; const btn = document.getElementById('pc-toggle-btn');
-        if (target === 'main') { btn.innerText = 'MAIN'; document.getElementById('ffmpeg-panel').style.display = 'none'; }
-        else { btn.innerText = 'SUB'; document.getElementById('ffmpeg-panel').style.display = 'block'; }
+        if (target === 'main') {
+            btn.innerText = 'MAIN';
+            document.getElementById('ffmpeg-panel').style.display = 'none';
+        } else {
+            btn.innerText = 'SUB';
+            document.getElementById('ffmpeg-panel').style.display = 'block';
+        }
         triggerToggleLit(); renderStats();
     }
 
@@ -640,6 +724,39 @@
         }).join("\n");
     }
 
+    function toggleAccordion(id) {
+        const body = document.getElementById(id);
+        const arrow = document.getElementById(id.replace('-body', '-arrow')) || document.getElementById(id.replace('-ffmpeg-body', '-ff-arrow'));
+        if (!body) return;
+        const isHidden = body.style.display === 'none';
+        if (isHidden) {
+            body.style.display = 'block';
+            if (arrow) arrow.innerText = '▼';
+            localStorage.setItem(`accordion_${id}`, 'open');
+        } else {
+            body.style.display = 'none';
+            if (arrow) arrow.innerText = '▲';
+            localStorage.setItem(`accordion_${id}`, 'closed');
+        }
+    }
+
+    function initAccordions() {
+        ['main-ffmpeg-body', 'sub-ffmpeg-body'].forEach(id => {
+            const body = document.getElementById(id);
+            const arrow = document.getElementById(id.replace('-body', '-arrow')) || document.getElementById(id.replace('-ffmpeg-body', '-ff-arrow'));
+            const state = localStorage.getItem(`accordion_${id}`);
+            if (body) {
+                if (state === 'closed') {
+                    body.style.display = 'none';
+                    if (arrow) arrow.innerText = '▲';
+                } else {
+                    body.style.display = 'block';
+                    if (arrow) arrow.innerText = '▼';
+                }
+            }
+        });
+    }
+
     function renderStats() {
         if (!cachedData) return;
         const alertBox = document.getElementById('mic-alert'); alertBox.className = "mic-alert-box " + cachedData.obs_status_class; alertBox.innerText = cachedData.obs_status_text;
@@ -650,10 +767,44 @@
             document.getElementById('cpu-val').innerText = cachedData.sub_cpu + '%'; document.getElementById('cpu-bar').style.width = cachedData.sub_cpu + '%'; document.getElementById('cpu-temp-val').innerText = (cachedData.sub_cpu_temp > 0 ? cachedData.sub_cpu_temp : '--') + '°C'; document.getElementById('sys-ram-val').innerText = cachedData.sub_sys_ram + 'GB';
             document.getElementById('gpu-val').innerText = cachedData.sub_gpu + '%'; document.getElementById('gpu-bar').style.width = cachedData.sub_gpu + '%';
             let p_val = parseFloat(cachedData.sub_cpu_power); document.getElementById('cpu-power-val').innerText = (!isNaN(p_val) && p_val > 0 ? p_val.toFixed(1) : '--') + 'W'; document.getElementById('gpu-vram-val').innerText = cachedData.sub_gpu_vram + 'GB';
-            document.getElementById('ff-status').innerText = cachedData.sub_status + (cachedData.file_count > 0 ? ` (${cachedData.file_count}本目)` : ''); document.getElementById('ff-filename').innerText = cachedData.filename; document.getElementById('ff-time').innerText = cachedData.sub_time; document.getElementById('ff-speed').innerText = cachedData.speed; document.getElementById('ff-elapsed').innerText = cachedData.time_elapsed ? cachedData.time_elapsed : '--:--:--';
-            let br = cachedData.bitrate; if (br) { br = br.replace(new RegExp('kbits/s|kb/s|kbps|b/s', 'gi'), '').trim(); } document.getElementById('ff-bitrate').innerText = br ? br : '--';
-            document.getElementById('ff-total-pct').innerText = cachedData.sub_total_progress; let pctValue = parseFloat(cachedData.sub_total_progress) || 0; document.getElementById('ff-progress-bar').style.width = pctValue + '%';
         }
+
+        // --- MAIN FFmpeg UI 更新 (PC選択状態に関わらず常時更新) ---
+        const mStatus = cachedData.main_ffmpeg_status || "待機中";
+        const mFileCount = cachedData.main_ffmpeg_file_count || 0;
+        document.getElementById('main-ff-status').innerText = mStatus + (mFileCount > 0 ? ` (${mFileCount}本目)` : '');
+        document.getElementById('main-ff-filename').innerText = cachedData.main_ffmpeg_filename || "--";
+        document.getElementById('main-ff-time').innerText = cachedData.main_ffmpeg_time || "--:--:--";
+        document.getElementById('main-ff-speed').innerText = cachedData.main_ffmpeg_speed || "--x";
+        document.getElementById('main-ff-elapsed').innerText = cachedData.main_ffmpeg_time_elapsed || "--:--:--";
+        
+        let mBr = cachedData.main_ffmpeg_bitrate || "--";
+        if (mBr) { mBr = mBr.replace(new RegExp('kbits/s|kb/s|kbps|b/s', 'gi'), '').trim(); }
+        document.getElementById('main-ff-bitrate').innerText = mBr ? mBr : '--';
+        
+        const mProg = cachedData.main_ffmpeg_total_progress || "--";
+        document.getElementById('main-ff-total-pct').innerText = mProg;
+        let mPctValue = parseFloat(mProg) || 0;
+        document.getElementById('main-ff-progress-bar').style.width = mPctValue + '%';
+
+        // --- SUB FFmpeg UI 更新 (PC選択状態に関わらず常時更新) ---
+        const sStatus = cachedData.sub_ffmpeg_status || cachedData.sub_status || "待機中";
+        const sFileCount = cachedData.sub_ffmpeg_file_count || cachedData.file_count || 0;
+        document.getElementById('sub-ff-status').innerText = sStatus + (sFileCount > 0 ? ` (${sFileCount}本目)` : '');
+        document.getElementById('sub-ff-filename').innerText = cachedData.sub_ffmpeg_filename || cachedData.filename || "--";
+        document.getElementById('sub-ff-time').innerText = cachedData.sub_ffmpeg_time || cachedData.sub_time || "--:--:--";
+        document.getElementById('sub-ff-speed').innerText = cachedData.sub_ffmpeg_speed || cachedData.speed || "--x";
+        document.getElementById('sub-ff-elapsed').innerText = cachedData.sub_ffmpeg_time_elapsed || cachedData.time_elapsed || "--:--:--";
+        
+        let sBr = cachedData.sub_ffmpeg_bitrate || cachedData.bitrate || "--";
+        if (sBr) { sBr = sBr.replace(new RegExp('kbits/s|kb/s|kbps|b/s', 'gi'), '').trim(); }
+        document.getElementById('sub-ff-bitrate').innerText = sBr ? sBr : '--';
+        
+        const sProg = cachedData.sub_ffmpeg_total_progress || cachedData.sub_total_progress || "--";
+        document.getElementById('sub-ff-total-pct').innerText = sProg;
+        let sPctValue = parseFloat(sProg) || 0;
+        document.getElementById('sub-ff-progress-bar').style.width = sPctValue + '%';
+
         document.getElementById('viewers-val').innerText = '👀 ' + cachedData.viewers; document.getElementById('likes-val').innerText = '👍 ' + cachedData.likes; 
         document.getElementById('comment-list-container').innerHTML = buildCommentListHtml(cachedData.comments_json);
         
@@ -664,14 +815,94 @@
         }
     }
 
+    // ==========================================================================
+    // 🎛️ 【新規アドオン】マクロレンダリング回路＆コンソールPostMessage同期システム
+    // ==========================================================================
+    function renderMacroDeck(macros, uiTheme) {
+        const mContainer = document.getElementById('macro-grid-container');
+        if (!mContainer) return;
+        mContainer.innerHTML = "";
+
+        // コンソールから指定されたテーマ（色・線）を安全に適用
+        if (uiTheme) {
+            mContainer.style.setProperty('--macro-accent', uiTheme.accent_color);
+            mContainer.style.setProperty('--macro-border', uiTheme.border_width);
+        }
+
+        if (macros && macros.length > 0) {
+            macros.forEach(m => {
+                const btn = document.createElement('div');
+                btn.className = "macro-btn";
+                btn.innerText = m.label;
+                
+                if (uiTheme) {
+                    btn.style.borderColor = uiTheme.accent_color;
+                    btn.style.borderWidth = uiTheme.border_width;
+                    btn.style.borderStyle = 'solid';
+                    if(uiTheme.font_size) { btn.style.fontSize = uiTheme.font_size; }
+                }
+                
+                // 🚀 マクロ実行APIへ直撃通信
+                btn.onclick = () => {
+                    fetch(`${API_BASE_URL}/api/execute-macro`, {
+                        method: "POST",
+                        body: JSON.stringify({ type: m.type, value: m.value })
+                    }).catch(() => {});
+                };
+                mContainer.appendChild(btn);
+            });
+        } else {
+            mContainer.innerHTML = '<div style="color:rgba(255,170,68,0.2); font-size:12px; grid-column:span 2; text-align:center; padding:20px 0;">配置済みのマクロボタンがありません。<br>コンソールから追加してください。</div>';
+        }
+    }
+
+    // 🔮 【天才的アイデアの核】コンソール画面からの「リアルタイム編集データ」を検知して最速で化けさせる受信窓口
+    window.addEventListener('message', function(event) {
+        // セキュリティ制限をくぐり抜け、コンソールから降ってきたConfigを直接解読
+        if (event.data && event.data.type === 'CONSOLE_SYNC') {
+            const config = event.data.config;
+            if (config) {
+                // UIデザイン（アクセントカラーなど）のリアルタイムプレビュー変更
+                if (config.ui_theme) {
+                    document.body.style.color = config.ui_theme.accent_color;
+                    const micAlert = document.getElementById('mic-alert');
+                    if(micAlert) micAlert.style.borderColor = config.ui_theme.accent_color;
+                    // ナビゲーションの細いボーダー線や色の同期
+                    document.querySelectorAll('.nav-tab').forEach(t => {
+                        t.style.setProperty('--accent-color', config.ui_theme.accent_color);
+                        t.style.borderColor = config.ui_theme.accent_color;
+                        t.style.borderWidth = config.ui_theme.border_width;
+                    });
+                }
+                // マクロボタンのリアルタイムプレビュー生成
+                renderMacroDeck(config.macros, config.ui_theme);
+                
+                // コンソール側で「タブ切り替えシミュレート」が押されたら、本物のタブも自動追従
+                if (event.data.activeTab) {
+                    switchTab(event.data.activeTab);
+                }
+            }
+        }
+    });
+
+
     function updateDashboard() {
-        fetch(PC_DATA_URL).then(response => response.json()).then(data => { cachedData = data; renderStats(); }).catch(() => {
+        fetch(PC_DATA_URL)
+        .then(response => response.json())
+        .then(data => { 
+            cachedData = data; 
+            renderStats(); 
+            renderMacroDeck(data.macros, data.ui_theme);
+        })
+        .catch(() => {
             document.getElementById('mic-alert').innerText = "🎙️ MIC: PC OFFLINE (接続切れ)";
             document.getElementById('mic-alert').className = "mic-alert-box mute";
         });
     }
     
     forceRenewTokenSilent();
+    initAccordions();
+    switchPC('main');
     updateDashboard();
     setInterval(updateDashboard, 2500);
     setInterval(forceRenewTokenSilent, 1800000);
