@@ -201,7 +201,7 @@
 
     <div id="panel-control" class="tab-panel">
         <div class="section-title">
-            <span>OBSシーン切り替え（自動同期盤）</span>
+            <span>OBSシーン切り替え</span>
             <button class="yt-btn" style="width:auto; padding:3px 8px; font-size:11px;" onclick="toggleSceneManagerWindow()">⚙️ 表示管理</button>
         </div>
         
@@ -215,10 +215,10 @@
         </div>
 
         <div class="section-title">
-            <span>Google Cloud 接続盤 <span id="net-badge-control" class="net-status-badge net-online">DIRECT ONLINE</span></span>
+            <span>YouTube Live <span id="net-badge-control" class="net-status-badge net-online">DIRECT MODE</span></span>
             <div style="display:flex; gap:6px;">
-                <button class="yt-btn" style="width:auto; padding:4px 8px; font-size:11px; border-color:#00ffff; color:#00ffff;" onclick="forceRenewTokenUI()">🔑 鍵の再取得</button>
-                <button class="yt-btn" style="width:auto; padding:4px 8px; font-size:11px;" onclick="loadYouTubeBroadcasts()">🔄 枠更新</button>
+                <button class="yt-btn" style="width:auto; padding:4px 8px; font-size:11px; border-color:#00ffff; color:#00ffff;" onclick="forceRenewTokenUI()">🔑 鍵更新</button>
+                <button class="yt-btn" style="width:auto; padding:4px 8px; font-size:11px;" onclick="loadYouTubeBroadcasts()">🔄 更新</button>
             </div>
         </div>
         <div id="yt-live-control-container">アクティブな配信枠をスキャン中...</div>
@@ -226,14 +226,14 @@
 
     <div id="panel-stats" class="tab-panel">
         <div class="section-title">
-            <span>チャンネルアナリティクス（直近28日間） <span id="net-badge-stats" class="net-status-badge net-online">DIRECT ONLINE</span></span>
-            <button class="yt-btn" style="width:auto; padding:4px 8px; font-size:11px; border-color:#00ffff; color:#00ffff;" onclick="forceRenewTokenUI()">🔑 鍵の再取得</button>
+            <span>アナリティクス（直近28日間） <span id="net-badge-stats" class="net-status-badge net-online">DIRECT MODE</span></span>
+            <button class="yt-btn" style="width:auto; padding:4px 8px; font-size:11px; border-color:#00ffff; color:#00ffff;" onclick="forceRenewTokenUI()">🔑 鍵更新</button>
         </div>
-        <div id="yt-analytics-container">YouTube API サーバーから神データをハント中...</div>
+        <div id="yt-analytics-container">YouTubeサーバーからデータを取得中...</div>
     </div>
 
     <div id="panel-macro" class="tab-panel">
-        <div class="section-title">🎛️ カスタム拡張マクロ (Macro Deck)</div>
+        <div class="section-title">🎛️ カスタム拡張マクロ</div>
         <div class="macro-grid" id="macro-grid-container">
         </div>
     </div>
@@ -289,22 +289,22 @@
         .then(tData => {
             if(tData.token) { 
                 localStorage.setItem("cached_yt_token", tData.token);
-                console.log("🔄 [常時備蓄防衛] メインPCから最新トークンを自動ハントし、スマホ側を最新化しました。");
+                console.log("🔄 PCから最新トークンを取得し、スマホ側を最新化しました。");
             }
         })
         .catch(() => {
-            console.log("📡 [常時備蓄防衛] PCがオフライン、または未起動のため自動リフレッシュをスキップ。");
+            console.log("📡 PCがオフライン、または未起動のため自動リフレッシュをスキップ。");
         });
     }
 
     function forceRenewTokenUI() {
-        alert("⏳ 認証の再同期リクエストを発射します...");
+        alert("⏳ 認証の再同期リクエストします...");
         fetch(PC_TOKEN_URL)
         .then(res => res.json())
         .then(tData => {
             if(tData.token) { 
                 localStorage.setItem("cached_yt_token", tData.token);
-                alert("✅ 【PC連携成功】メインPCから最新の1時間トークンをハントし、同期完了しました！");
+                alert("✅ 【PC連携成功】メインPCから最新のトークンを取得し、同期しました");
             } else { alert("⚠ PCから空の鍵が返されました。スマホ内の既存の鍵を維持します。"); }
             refreshCurrentTabContent();
         })
@@ -406,7 +406,7 @@
     function proceedFetchBroadcasts(token) {
         const controlContainer = document.getElementById('yt-live-control-container');
         if(!token) {
-            controlContainer.innerHTML = '<div class="comment-card"><div class="user-text" style="color:#ff4444; text-align:center;">エラー: 通行証(token)がありません。PCを起動するか「鍵の再取得」を押してください。</div></div>';
+            controlContainer.innerHTML = '<div class="comment-card"><div class="user-text" style="color:#ff4444; text-align:center;">エラー: 通行証(token)がありません。PCを起動するか「鍵更新」を押してください。</div></div>';
             return;
         }
         
@@ -471,7 +471,7 @@
                         </select>
                     </div>
                     
-                    <button class="yt-btn" style="margin-bottom:15px; background:rgba(255,170,68,0.08);" onclick="pushYouTubeUpdate('${b.id}', '${status}', '${scheduledStartTime}', this)">⚡ YouTubeに直接設定を反映する</button>
+                    <button class="yt-btn" style="margin-bottom:15px; background:rgba(255,170,68,0.08);" onclick="pushYouTubeUpdate('${b.id}', '${status}', '${scheduledStartTime}', this)">⚡ YouTubeに設定を反映する</button>
                     
                     <label class="yt-label">チャット投稿</label>
                     <div class="chat-input-zone">
@@ -484,10 +484,10 @@
                     </div>
                 </div>`;
             });
-            controlContainer.innerHTML = liveHtml || '<div class="comment-card"><div class="user-text" style="text-align:center;">現在オンライン・待機中の配信枠はありません。1時間を超えた場合はPCを起動するか「鍵の再取得」をお試しください。</div></div>';
+            controlContainer.innerHTML = liveHtml || '<div class="comment-card"><div class="user-text" style="text-align:center;">現在オンライン・待機中の配信枠はありません。1時間を超えた場合はPCを起動するか「鍵更新」をお試しください。</div></div>';
         })
         .catch(err => {
-            controlContainer.innerHTML = `<div class="comment-card"><div class="user-text" style="text-align:center;">通信遮断エラー（鍵の有効期限が切れた可能性があります。「鍵の再取得」を押してください）</div></div>`;
+            controlContainer.innerHTML = `<div class="comment-card"><div class="user-text" style="text-align:center;">通信遮断エラー（鍵の有効期限が切れた可能性があります。「鍵更新」を押してください）</div></div>`;
         });
     }
 
@@ -503,7 +503,7 @@
             proceedFetchBroadcasts(localStorage.getItem("cached_yt_token"));
         })
         .catch(() => {
-            if(bBadge) { bBadge.innerText = "単独直撃 EMERGENCY"; bBadge.className = "net-status-badge net-offline"; }
+            if(bBadge) { bBadge.innerText = "PC OFFLINE"; bBadge.className = "net-status-badge net-offline"; }
             proceedFetchBroadcasts(localStorage.getItem("cached_yt_token"));
         });
     }
@@ -554,7 +554,7 @@
         })
         .then(res => {
             if(res.ok) {
-                targetBtn.innerText = "✅ 反映完了しました！"; targetBtn.style.borderColor = "#55ff55"; targetBtn.style.color = "#55ff55";
+                targetBtn.innerText = "✅ 反映しました！"; targetBtn.style.borderColor = "#55ff55"; targetBtn.style.color = "#55ff55";
                 setTimeout(() => { targetBtn.innerText = originalText; targetBtn.style.borderColor = "#ffaa44"; targetBtn.style.color = "#ffaa44"; loadYouTubeBroadcasts(); }, 1500);
             } else {
                 return res.json().then(err => {
@@ -599,7 +599,7 @@
         .catch(err => {
             clearTimeout(timeoutId); btn.innerText = orig; btn.disabled = false;
             console.log("PCルート断念。公式アプリリンクを展開します:", err.message);
-            if (confirm("⚠️ 【PC応答なし / タイムアウト】\nPC経由での投稿がタイムアウトしたか、PCがオフラインです。スマホの【YouTube公式アプリ】で配信ページを開き、配信主として直接チャットを投稿しますか？")) {
+            if (confirm("⚠️ 【PC応答なし / タイムアウト】\nPC経由での投稿がタイムアウトしたか、PCがオフラインです。スマホの【YouTube公式アプリ】で配信ページを開き、直接チャットを投稿しますか？")) {
                 window.open(`https://www.youtube.com/watch?v=${broadcastId}`, '_blank');
                 txtInput.value = ''; 
             }
@@ -643,8 +643,7 @@
                 pastHtml += `
                 <div class="yt-broadcast-card" style="border-color:rgba(255,170,68,0.1); background:rgba(255,170,68,0.01); padding:10px; margin-bottom:8px;">
                     <div style="font-size:12px; font-weight:bold; color:#fff; margin-bottom:6px;">🎬 ${v.title} <span style="font-size:10px; color:rgba(255,170,68,0.4); margin-left:6px;">(${v.date})</span></div>
-                    <div class="analytics-grid" style="margin-bottom:0; grid-template-columns: repeat(4, 1fr);">
-                        <div class="an-card" style="border:none; background:rgba(255,255,255,0.02); padding:4px;"><div class="an-label">最高同接</div><div class="an-val" style="color:#ffaa44; font-size:14px;">🔥 ${parseInt(v.max_viewers).toLocaleString()}</div></div>
+                    <div class="analytics-grid" style="margin-bottom:0; grid-template-columns: repeat(3, 1fr);">
                         <div class="an-card" style="border:none; background:rgba(255,255,255,0.02); padding:4px;"><div class="an-label">総視聴数</div><div class="an-val" style="color:#fff; font-size:14px;">${parseInt(v.views).toLocaleString()}</div></div>
                         <div class="an-card" style="border:none; background:rgba(255,255,255,0.02); padding:4px;"><div class="an-label">高評価</div><div class="an-val" style="color:#ff44aa; font-size:14px;">${parseInt(v.likes).toLocaleString()}</div></div>
                         <div class="an-card" style="border:none; background:rgba(255,255,255,0.02); padding:4px;"><div class="an-label">コメント</div><div class="an-val" style="color:#00ffff; font-size:14px;">${parseInt(v.comments).toLocaleString()}</div></div>
@@ -665,7 +664,7 @@
                         <div class="an-val" style="color:#00aaff; font-size:26px;">${d.an_28d_watch.toLocaleString()}h</div>
                     </div>
                     <div class="an-card" style="padding:12px 4px;">
-                        <div class="an-label">👀 28日間 総視聴数</div>
+                        <div class="an-label">👀 総視聴数</div>
                         <div class="an-val" style="color:#fff;">${d.an_28d_views.toLocaleString()}回</div>
                     </div>
                     <div class="an-card" style="padding:12px 4px;">
@@ -678,7 +677,7 @@
                     </div>
 
                 </div>
-                <div class="section-title"><span>直近アーカイブ通知表</span></div>
+                <div class="section-title"><span>直近アーカイブ</span></div>
                 ${pastHtml || '<div class="user-text">アーカイブデータがありません</div>'}`;
         })
         .catch(() => {
