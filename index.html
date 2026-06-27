@@ -23,7 +23,6 @@
         }
         .dashboard-nav {
             display: flex;
-            gap: 8px;
             margin-bottom: 15px;
             border-bottom: 1px solid rgba(255, 170, 68, 0.15);
             padding-bottom: 8px;
@@ -314,12 +313,20 @@
     <script>
     // URL設定。ローカル実行時とプレビュー時を自動判定してフォールバック
     const MAIN_PC_IP = "192.168.10.103"; 
+    const NGROK_URL = "https://straggler-verbose-doorstop.ngrok-free.dev";
     const CURRENT_ORIGIN = window.location.origin;
     
-    // APIサーバーのベースURLを自動解決。ローカルIP直撃の場合はPC_IPを使い、それ以外（ブラウザ自身からの相対パスなど）はoriginを使う
-    const API_BASE_URL = CURRENT_ORIGIN.includes("192.168.10.") || CURRENT_ORIGIN.includes("localhost") || CURRENT_ORIGIN.includes("127.0.0.1")
+    // APIサーバーのベースURLを自動解決。
+    // 1. ローカルIP、localhost、127.0.0.1、またはngrok経由で直接開かれている場合は、そのoriginをそのまま使う
+    // 2. それ以外の外部サーバー（GitHub Pagesなど）から開かれた場合は、HTTPS接続維持（Mixed Content回避）のためngrokドメインを使用
+    const API_BASE_URL = (
+        CURRENT_ORIGIN.includes("192.168.10.") || 
+        CURRENT_ORIGIN.includes("localhost") || 
+        CURRENT_ORIGIN.includes("127.0.0.1") ||
+        CURRENT_ORIGIN.includes("ngrok-free.dev")
+    )
         ? CURRENT_ORIGIN 
-        : `http://${MAIN_PC_IP}:8000`;
+        : NGROK_URL;
 
     const PC_DATA_URL = `${API_BASE_URL}/api/data`;
     const PC_TOKEN_URL = `${API_BASE_URL}/api/youtube/token`; 
