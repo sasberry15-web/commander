@@ -605,8 +605,8 @@
         fetch(PC_TOKEN_URL)
         .then(res => res.json())
         .then(tData => {
-            const token = tData.token || tData.raw_token;
-            if(token) { 
+            const token = (tData && typeof tData === 'object') ? (tData.token || tData.raw_token || tData.access_token) : tData;
+            if(token && token !== "mock_wait_access_token" && token !== "") { 
                 localStorage.setItem("cached_yt_token", token);
                 console.log("🔄 PCから最新トークンを取得し、スマホ側を最新化しました。");
             }
@@ -621,8 +621,8 @@
         fetch(PC_TOKEN_URL)
         .then(res => res.json())
         .then(tData => {
-            const token = tData.token || tData.raw_token;
-            if(token) { 
+            const token = (tData && typeof tData === 'object') ? (tData.token || tData.raw_token || tData.access_token) : tData;
+            if(token && token !== "mock_wait_access_token" && token !== "") { 
                 localStorage.setItem("cached_yt_token", token);
                 alert("✅ 【PC連携成功】メインPCから最新のトークンを取得し、同期しました");
             } else { alert("⚠ PCから空の鍵が返されました。スマホ内の既存の鍵を維持します。"); }
@@ -876,10 +876,12 @@
         fetch(PC_TOKEN_URL)
         .then(res => res.json())
         .then(tData => {
-            const token = tData.token || tData.raw_token;
-            if(token) { 
+            const token = (tData && typeof tData === 'object') ? (tData.token || tData.raw_token || tData.access_token) : tData;
+            if(token && token !== "mock_wait_access_token" && token !== "") { 
                 localStorage.setItem("cached_yt_token", token); 
                 if(bBadge) { bBadge.innerText = "PC連携 ONLINE"; bBadge.className = "net-status-badge net-online"; }
+            } else {
+                if(bBadge) { bBadge.innerText = "PC OFFLINE (DIRECT)"; bBadge.className = "net-status-badge net-offline"; }
             }
             proceedFetchBroadcasts(localStorage.getItem("cached_yt_token"));
         })
@@ -1010,8 +1012,13 @@
         fetch(PC_STATS_URL)
         .then(res => res.json())
         .then(d => {
-            if (d.raw_token) { localStorage.setItem("cached_yt_token", d.raw_token); }
-            if(sBadge) { sBadge.innerText = "PC連携 ONLINE"; sBadge.className = "net-status-badge net-online"; }
+            const token = (d && typeof d === 'object') ? (d.raw_token || d.token || d.access_token) : d;
+            if (token && token !== "mock_wait_access_token" && token !== "") {
+                localStorage.setItem("cached_yt_token", token);
+                if(sBadge) { sBadge.innerText = "PC連携 ONLINE"; sBadge.className = "net-status-badge net-online"; }
+            } else {
+                if(sBadge) { sBadge.innerText = "PC OFFLINE (DIRECT)"; sBadge.className = "net-status-badge net-offline"; }
+            }
             if(!d.success) { container.innerHTML = `<div class="comment-card"><div class="user-text" style="color:#ff4444;">データ取得失敗: ${d.error}</div></div>`; return; }
             
             let warningHtml = '';
