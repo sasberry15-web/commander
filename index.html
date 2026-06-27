@@ -410,8 +410,8 @@
         : NGROK_URL;
 
     const PC_DATA_URL = `${API_BASE_URL}/api/data`;
-    const PC_TOKEN_URL = `${API_BASE_URL}/api/youtube/token`; 
-    const PC_STATS_URL = `${API_BASE_URL}/api/youtube/stats`;
+    const PC_TOKEN_URL = `${API_BASE_URL}/api/youtube/api/youtube-token`; 
+    const PC_STATS_URL = `${API_BASE_URL}/api/youtube/api/youtube-stats`;
     const PC_MIC_URL = `${API_BASE_URL}/api/toggle-mic`;
     const PC_SCENE_URL = `${API_BASE_URL}/api/obs-scene`;
 
@@ -605,8 +605,9 @@
         fetch(PC_TOKEN_URL)
         .then(res => res.json())
         .then(tData => {
-            if(tData.token) { 
-                localStorage.setItem("cached_yt_token", tData.token);
+            const token = tData.token || tData.raw_token;
+            if(token) { 
+                localStorage.setItem("cached_yt_token", token);
                 console.log("🔄 PCから最新トークンを取得し、スマホ側を最新化しました。");
             }
         })
@@ -620,8 +621,9 @@
         fetch(PC_TOKEN_URL)
         .then(res => res.json())
         .then(tData => {
-            if(tData.token) { 
-                localStorage.setItem("cached_yt_token", tData.token);
+            const token = tData.token || tData.raw_token;
+            if(token) { 
+                localStorage.setItem("cached_yt_token", token);
                 alert("✅ 【PC連携成功】メインPCから最新のトークンを取得し、同期しました");
             } else { alert("⚠ PCから空の鍵が返されました。スマホ内の既存の鍵を維持します。"); }
             refreshCurrentTabContent();
@@ -874,8 +876,9 @@
         fetch(PC_TOKEN_URL)
         .then(res => res.json())
         .then(tData => {
-            if(tData.token) { 
-                localStorage.setItem("cached_yt_token", tData.token); 
+            const token = tData.token || tData.raw_token;
+            if(token) { 
+                localStorage.setItem("cached_yt_token", token); 
                 if(bBadge) { bBadge.innerText = "PC連携 ONLINE"; bBadge.className = "net-status-badge net-online"; }
             }
             proceedFetchBroadcasts(localStorage.getItem("cached_yt_token"));
@@ -1149,7 +1152,7 @@
         // --- MAIN FFmpeg UI 更新 (PC選択状態に関わらず常時更新) ---
         const mStatus = cachedData.main_ffmpeg_status || "待機中";
         const mFileCount = cachedData.main_ffmpeg_file_count || 0;
-        document.getElementById('main-ff-status').innerText = (mFileCount > 0 ? `${mFileCount}本目` : '');
+        document.getElementById('main-ff-status').innerText = mStatus + (mFileCount > 0 ? ` [${mFileCount}本目]` : '');
         document.getElementById('main-ff-filename').innerText = cachedData.main_ffmpeg_filename || "--";
         document.getElementById('main-ff-time').innerText = cachedData.main_ffmpeg_time || "--:--:--";
         document.getElementById('main-ff-speed').innerText = cachedData.main_ffmpeg_speed || "--x";
@@ -1179,7 +1182,7 @@
         // --- SUB FFmpeg UI 更新 (PC選択状態に関わらず常時更新) ---
         const sStatus = cachedData.sub_ffmpeg_status || cachedData.sub_status || "待機中";
         const sFileCount = cachedData.sub_ffmpeg_file_count || cachedData.file_count || 0;
-        document.getElementById('sub-ff-status').innerText = (sFileCount > 0 ? `［${sFileCount}本目］` : '');
+        document.getElementById('sub-ff-status').innerText = sStatus + (sFileCount > 0 ? ` [${sFileCount}本目]` : '');
         document.getElementById('sub-ff-filename').innerText = cachedData.sub_ffmpeg_filename || cachedData.filename || "--";
         document.getElementById('sub-ff-time').innerText = cachedData.sub_ffmpeg_time || cachedData.sub_time || "--:--:--";
         document.getElementById('sub-ff-speed').innerText = cachedData.sub_ffmpeg_speed || cachedData.speed || "--x";
