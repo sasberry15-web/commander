@@ -311,6 +311,36 @@
     </div>
 
     <script>
+    // ngrok の無料アカウント警告ページを自動バイパスするグローバル fetch パッチ
+    const originalFetch = window.fetch;
+    window.fetch = function(input, init) {
+        let isNgrok = false;
+        if (typeof input === 'string') {
+            isNgrok = input.includes('ngrok-free.dev') || input.includes('ngrok-free.app');
+        } else if (input && typeof input.url === 'string') {
+            isNgrok = input.url.includes('ngrok-free.dev') || input.url.includes('ngrok-free.app');
+        }
+        
+        if (isNgrok) {
+            init = init || {};
+            if (init.headers) {
+                if (init.headers instanceof Headers) {
+                    init.headers.set('ngrok-skip-browser-warning', 'any');
+                } else if (Array.isArray(init.headers)) {
+                    const hasHeader = init.headers.some(h => h[0].toLowerCase() === 'ngrok-skip-browser-warning');
+                    if (!hasHeader) {
+                        init.headers.push(['ngrok-skip-browser-warning', 'any']);
+                    }
+                } else {
+                    init.headers['ngrok-skip-browser-warning'] = 'any';
+                }
+            } else {
+                init.headers = { 'ngrok-skip-browser-warning': 'any' };
+            }
+        }
+        return originalFetch(input, init);
+    };
+
     // URL設定。ローカル実行時とプレビュー時を自動判定してフォールバック
     const MAIN_PC_IP = "192.168.10.103"; 
     const NGROK_URL = "https://straggler-verbose-doorstop.ngrok-free.dev";
