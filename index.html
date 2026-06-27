@@ -1270,6 +1270,43 @@
         document.body.style.fontFamily = fontFamily;
         document.body.style.fontSize = fontSize;
 
+        // 📈 プロポーショナル（比例）フォントスケーリングの実装
+        const pct = parseFloat(fontSize) || 100;
+        const fontScale = pct / 100;
+        document.documentElement.style.setProperty('--font-scale', fontScale);
+
+        let scaleStyle = document.getElementById('dynamic-font-scale-style');
+        if (!scaleStyle) {
+            scaleStyle = document.createElement('style');
+            scaleStyle.id = 'dynamic-font-scale-style';
+            document.head.appendChild(scaleStyle);
+        }
+        scaleStyle.innerHTML = `
+            body { font-size: calc(16px * var(--font-scale)) !important; }
+            .nav-tab { font-size: calc(13px * var(--font-scale)) !important; }
+            .stat-side-label { font-size: calc(13px * var(--font-scale)) !important; }
+            .stat-value { font-size: calc(32px * var(--font-scale)) !important; }
+            .mic-alert-box { font-size: calc(14px * var(--font-scale)) !important; }
+            .toggle-button { font-size: calc(13px * var(--font-scale)) !important; }
+            .ffmpeg-file { font-size: calc(13px * var(--font-scale)) !important; }
+            .ffmpeg-grid { font-size: calc(13px * var(--font-scale)) !important; }
+            .section-title { font-size: calc(11px * var(--font-scale)) !important; }
+            .live-status { font-size: calc(12px * var(--font-scale)) !important; }
+            .comment-card .user-name { font-size: calc(20px * var(--font-scale)) !important; }
+            .comment-card .user-text { font-size: calc(28px * var(--font-scale)) !important; }
+            .yt-broadcast-card { font-size: calc(14px * var(--font-scale)) !important; }
+            .yt-textarea { font-size: calc(15px * var(--font-scale)) !important; }
+            .yt-select { font-size: calc(15px * var(--font-scale)) !important; }
+            .yt-btn { font-size: calc(14px * var(--font-scale)) !important; }
+            .chat-txt { font-size: calc(14px * var(--font-scale)) !important; }
+            .an-label { font-size: calc(11px * var(--font-scale)) !important; }
+            .an-val { font-size: calc(20px * var(--font-scale)) !important; }
+            .scene-mgr-item { font-size: calc(13px * var(--font-scale)) !important; }
+            .macro-btn { font-size: calc(14px * var(--font-scale)) !important; }
+            .ffmpeg-accordion-header span { font-size: calc(13px * var(--font-scale)) !important; }
+            #main-ff-total-pct, #sub-ff-total-pct { font-size: calc(11px * var(--font-scale)) !important; }
+        `;
+
         const micAlert = document.getElementById('mic-alert');
         if (micAlert) {
             micAlert.style.borderColor = accent;
@@ -1298,6 +1335,15 @@
                 btn.style.fontSize = uiTheme.font_size;
             }
         });
+
+        // 🚀 iOS Safari / iPhone などのレンダリングキャッシュ起因のレイアウト崩れ対策 (強制リフロー/再描画)
+        try {
+            document.body.style.display = 'none';
+            document.body.offsetHeight; // リフローを強制トリガー
+            document.body.style.display = '';
+        } catch (e) {
+            console.error("Reflow trigger error", e);
+        }
     }
 
     function renderMacroDeck(macros, uiTheme) {
