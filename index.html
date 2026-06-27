@@ -204,9 +204,60 @@
             background: rgba(255,170,68,0.08);
         }
 
+        /* ngrok初回開通警告バナー/モーダル */
+        .ngrok-warning-banner {
+            display: none;
+            background: rgba(255, 68, 68, 0.12);
+            border: 2px dashed #ff4444;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            color: #ffaa55;
+            text-align: center;
+            box-shadow: 0 0 15px rgba(255, 68, 68, 0.25);
+        }
+        .ngrok-warning-banner h4 {
+            font-size: 15px;
+            font-weight: bold;
+            color: #ff4444;
+            margin-bottom: 6px;
+        }
+        .ngrok-warning-banner p {
+            font-size: 12px;
+            line-height: 1.4;
+            margin-bottom: 12px;
+            color: #ffddbb;
+        }
+        .ngrok-link-btn {
+            display: inline-block;
+            background: #ff4444;
+            color: #fff !important;
+            font-weight: bold;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 13px;
+            box-shadow: 0 0 10px rgba(255, 68, 68, 0.4);
+            transition: all 0.2s ease;
+        }
+        .ngrok-link-btn:active {
+            transform: scale(0.96);
+            background: #cc3333;
+        }
+
     </style>
 </head>
 <body>
+
+    <!-- ngrok初回開通警告バナー -->
+    <div id="ngrok-warning" class="ngrok-warning-banner">
+        <h4>⚠️ ngrok接続の初回承認が必要です</h4>
+        <p>
+            外部接続（ngrok）経由の通信がブロックされている可能性があります。<br>
+            以下のボタンから一度直接ngrokを開き、<strong>「Visit Site」</strong>（サイトを訪問する）をクリックして開通させてください。
+        </p>
+        <a id="ngrok-btn-link" href="#" target="_blank" class="ngrok-link-btn">🔑 接続を許可する (Visit Site)</a>
+    </div>
 
     <video id="no-sleep-video" loop playsinline muted autoplay style="position:fixed; top:0; left:0; width:1px; height:1px; opacity:0.01; pointer-events:none; z-index:-1000;">
         <source src="data:video/mp4;base64,AAAAIGZ0eXBtcDQyAAAAAG1wNDJpc29tYXZjMQBtcDQyAAAAH21vb3YAAABsbXZoZAAAAABfS8pYX0vKWAAB9AAAAdwAAQAAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAACAdHJhawAAXHRraGQAAAADX0vKWF9LylgAAAABAAAAAAAB3AAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAABtZWRpYQAAACBtZGhkAAAAAF9LylhfS8pYAAH0AAAAdwBVY2gAAAAAACloZGxyAAAAAAAAAAB2aWRlbwAAAAAAAAAAAAAAAFZpZGVvTWVkaWEAAAAAVW1pbmYAAAAUdm1oZAAAAAAAQAAAQQAAAAgAc3RibAAAAGZzdHNkAAAAAAAAAAEAAABWYXZjMQAAAAAAAAAAAAAAAAAAAAgACABIAAAASAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGP//AAAARWF2Y0MBbYAKbP/hABhnY0AKbEAhsBAgAAMAAgAAAwB9AAfJgAEABW1kYXQAAAAYR2WeAAMwGQYExv//739fS8pYX0vKWAAAABhkaW5mAAAAEGRyZWYAAAAAAAAAAQAAAAxtdXJsAAAAAQAAAEZzdHRzAAAAAAAAAAEAAAABAAABAAAAAABzdHNjAAAAAAAAAAEAAAABAAAAAQAAAAEAAAAAc3RzeiAAAAAAAAAAAAAAAQAAABgAAAAAc3RjbwAAAAAAAAABAAAAMAAAADdidWRhAAAAKm1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXIAAAAAAAAAAAAAAAAAAAAAAAAAY2lsc3QAAAA=" type="video/mp4">
@@ -1290,10 +1341,30 @@
 
 
     function updateDashboard() {
+        // ngrok 警告リンクの更新
+        const ngrokWarningLink = document.getElementById('ngrok-btn-link');
+        if (ngrokWarningLink && ngrokWarningLink.getAttribute('href') !== NGROK_URL) {
+            ngrokWarningLink.setAttribute('href', NGROK_URL);
+        }
+
         fetch(PC_DATA_URL)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("HTTP error: " + response.status);
+            }
+            // 返ってきた content-type が json でない場合は ngrok の HTML 警告画面の可能性があるため弾く
+            const contentType = response.headers.get("content-type");
+            if (contentType && !contentType.includes("application/json")) {
+                throw new Error("Not a JSON response");
+            }
+            return response.json();
+        })
         .then(data => { 
             cachedData = data; 
+            
+            // 接続に成功したので ngrok 警告バナーを非表示にする
+            const ngrokBanner = document.getElementById('ngrok-warning');
+            if (ngrokBanner) ngrokBanner.style.display = 'none';
             
             // ポーリングによるデータ更新の際、コンソールで編集中の一時同期データがあればそちらを優先（巻き戻り防止）
             let activeTabs = data.tabs;
@@ -1311,7 +1382,13 @@
             renderMacroDeck(activeMacros, activeUiTheme);
             applyUiTheme(activeUiTheme);
         })
-        .catch(() => {
+        .catch(err => {
+            // 外部サーバー（GitHub Pages等）から開いていて、かつ接続に失敗した場合は、ngrok開通未承認の可能性が高いため警告を出す
+            if (!CURRENT_ORIGIN.includes("192.168.10.") && !CURRENT_ORIGIN.includes("localhost") && !CURRENT_ORIGIN.includes("127.0.0.1")) {
+                const ngrokBanner = document.getElementById('ngrok-warning');
+                if (ngrokBanner) ngrokBanner.style.display = 'block';
+            }
+
             document.getElementById('mic-alert').innerText = "🎙️ MIC: PC OFFLINE (接続切れ)";
             document.getElementById('mic-alert').className = "mic-alert-box mute";
         });
