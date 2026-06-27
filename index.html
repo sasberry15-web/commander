@@ -322,8 +322,8 @@
         : `http://${MAIN_PC_IP}:8000`;
 
     const PC_DATA_URL = `${API_BASE_URL}/api/data`;
-    const PC_TOKEN_URL = `http://${MAIN_PC_IP}:8002/api/youtube-token`; 
-    const PC_STATS_URL = `${API_BASE_URL}/api/youtube-stats`;
+    const PC_TOKEN_URL = `${API_BASE_URL}/api/youtube/token`; 
+    const PC_STATS_URL = `${API_BASE_URL}/api/youtube/stats`;
     const PC_MIC_URL = `${API_BASE_URL}/api/toggle-mic`;
     const PC_SCENE_URL = `${API_BASE_URL}/api/obs-scene`;
 
@@ -336,14 +336,57 @@
         } catch (err) { console.log("WakeLock Error: " + err.message); }
     }
     
+    let noSleepInterval = null;
     function def_wakeUpPhoneShield() {
         const v = document.getElementById('no-sleep-video');
-        if (v && v.paused) { v.play().catch(() => {}); }
+        if (v) {
+            if (v.paused) {
+                v.play().catch(() => {});
+            }
+            // iOS Safari/Edge 向け：ビデオが一時停止や休止状態にならないよう、定期的に微小再生移動やリプレイを掛ける
+            if (!noSleepInterval) {
+                noSleepInterval = setInterval(() => {
+                    if (v.paused) {
+                        v.play().catch(() => {});
+                    } else {
+                        // 再生位置をわずかに戻して無限ループを維持し、ブラウザの省電力スリープ判定をだます
+                        if (v.currentTime > 0.5) {
+                            v.currentTime = 0.1;
+                        }
+                    }
+                }, 10000); // 10秒ごとに維持確認
+            }
+        }
         requestWakeLock();
     }
     document.body.addEventListener('click', def_wakeUpPhoneShield, { once: false });
     document.body.addEventListener('touchstart', def_wakeUpPhoneShield, { once: false });
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { requestWakeLock(); } });
+
+    // 🕒 バックグラウンド（非アクティブ時）通信休止コントロール
+    let dashboardInterval = null;
+
+    function startDashboardPolling() {
+        if (!dashboardInterval) {
+            dashboardInterval = setInterval(updateDashboard, 2500); // 2.5秒に1回のデータ取得（通信負荷を大幅に最適化）
+        }
+    }
+
+    function stopDashboardPolling() {
+        if (dashboardInterval) {
+            clearInterval(dashboardInterval);
+            dashboardInterval = null;
+        }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            requestWakeLock();
+            updateDashboard(); // 画面に復帰した瞬間に最速でデータ取得
+            startDashboardPolling();
+        } else {
+            stopDashboardPolling(); // 非表示（スリープ、他アプリ使用時）は通信を完全にシャットアウト
+        }
+    });
 
     const TAB_INFO = {
         "status": "📊 配信監視",
@@ -1241,7 +1284,7 @@
     initAccordions();
     switchPC('main');
     updateDashboard();
-    setInterval(updateDashboard, 1000);
+    startDashboardPolling();
     setInterval(forceRenewTokenSilent, 1800000);
     </script>
 </body>
