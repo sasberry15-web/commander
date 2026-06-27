@@ -1283,10 +1283,39 @@
         }
         scaleStyle.innerHTML = `
             body { font-size: calc(16px * var(--font-scale)) !important; }
-            .nav-tab { font-size: calc(13px * var(--font-scale)) !important; }
-            .stat-side-label { font-size: calc(13px * var(--font-scale)) !important; }
-            .stat-value { font-size: calc(32px * var(--font-scale)) !important; }
-            .mic-alert-box { font-size: calc(14px * var(--font-scale)) !important; }
+            .nav-tab { 
+                font-size: calc(13px * var(--font-scale)) !important; 
+                white-space: nowrap; 
+                overflow: hidden; 
+                text-overflow: ellipsis; 
+                min-width: 0;
+            }
+            .stat-card {
+                min-width: 0;
+            }
+            .stat-inline-row {
+                min-width: 0;
+                overflow: hidden;
+            }
+            .stat-side-label { 
+                font-size: calc(13px * var(--font-scale)) !important; 
+                white-space: nowrap; 
+                overflow: hidden; 
+                text-overflow: ellipsis;
+                min-width: 0;
+            }
+            .stat-value { 
+                font-size: calc(32px * var(--font-scale)) !important; 
+                white-space: nowrap; 
+                overflow: hidden; 
+                text-overflow: ellipsis;
+            }
+            .mic-alert-box { 
+                font-size: calc(14px * var(--font-scale)) !important; 
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
             .toggle-button { font-size: calc(13px * var(--font-scale)) !important; }
             .ffmpeg-file { font-size: calc(13px * var(--font-scale)) !important; }
             .ffmpeg-grid { font-size: calc(13px * var(--font-scale)) !important; }
@@ -1336,11 +1365,24 @@
             }
         });
 
-        // 🚀 iOS Safari / iPhone などのレンダリングキャッシュ起因のレイアウト崩れ対策 (強制リフロー/再描画)
+        // 🚀 iOS Safari / iPhone 17 などの超高解像度・強力ラスタライズキャッシュを無効化する非同期ダブル・リフレッシュ＆強制再レイアウト
         try {
-            document.body.style.display = 'none';
-            document.body.offsetHeight; // リフローを強制トリガー
-            document.body.style.display = '';
+            document.documentElement.style.webkitTextSizeAdjust = '100%';
+            document.documentElement.style.textSizeAdjust = '100%';
+
+            // bodyに一瞬だけ微小なスケールトグルを加え、1フレーム(16ms)挟んで完全な再描画を強制する
+            document.body.style.transform = 'scale(0.9999)';
+            document.body.style.opacity = '0.99';
+            document.body.offsetHeight; // 同期リフロートリガー
+
+            requestAnimationFrame(() => {
+                document.body.offsetHeight; // 描画前フレームのレイアウト再計算
+                requestAnimationFrame(() => {
+                    document.body.style.transform = '';
+                    document.body.style.opacity = '';
+                    document.body.offsetHeight; // 最終リフロー
+                });
+            });
         } catch (e) {
             console.error("Reflow trigger error", e);
         }
