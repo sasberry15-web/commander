@@ -601,31 +601,60 @@
         }
     }
 
+    function updateYTBadges(isOnline) {
+        const bBadge = document.getElementById('net-badge-control');
+        const sBadge = document.getElementById('net-badge-stats');
+        const text = isOnline ? "PC連携 ONLINE" : "PC OFFLINE (DIRECT)";
+        const cls = isOnline ? "net-status-badge net-online" : "net-status-badge net-offline";
+        if (bBadge) { bBadge.innerText = text; bBadge.className = cls; }
+        if (sBadge) { sBadge.innerText = text; sBadge.className = cls; }
+    }
+
+    async function fetchLatestToken() {
+        try {
+            const res = await fetch(PC_TOKEN_URL);
+            const tData = await res.json();
+            let token = (tData && typeof tData === 'object') ? (tData.token || tData.raw_token || tData.access_token) : tData;
+            if (token && token !== "mock_wait_access_token" && token !== "") {
+                return token;
+            }
+        } catch (e) {
+            console.log("Token URL error, trying stats fallback...", e);
+        }
+        
+        try {
+            const res = await fetch(PC_STATS_URL);
+            const d = await res.json();
+            const token = (d && typeof d === 'object') ? (d.raw_token || d.token || d.access_token) : d;
+            if (token && token !== "mock_wait_access_token" && token !== "") {
+                return token;
+            }
+        } catch (e) {
+            console.log("Stats URL error for token fallback", e);
+        }
+        return null;
+    }
+
     function forceRenewTokenSilent() {
-        fetch(PC_TOKEN_URL)
-        .then(res => res.json())
-        .then(tData => {
-            const token = (tData && typeof tData === 'object') ? (tData.token || tData.raw_token || tData.access_token) : tData;
-            if(token && token !== "mock_wait_access_token" && token !== "") { 
+        fetchLatestToken().then(token => {
+            if(token) { 
                 localStorage.setItem("cached_yt_token", token);
                 console.log("🔄 PCから最新トークンを取得し、スマホ側を最新化しました。");
             }
-        })
-        .catch(() => {
+        }).catch(() => {
             console.log("📡 PCがオフライン、または未起動のため自動リフレッシュをスキップ。");
         });
     }
 
     function forceRenewTokenUI() {
         alert("⏳ 認証の再同期リクエストします...");
-        fetch(PC_TOKEN_URL)
-        .then(res => res.json())
-        .then(tData => {
-            const token = (tData && typeof tData === 'object') ? (tData.token || tData.raw_token || tData.access_token) : tData;
-            if(token && token !== "mock_wait_access_token" && token !== "") { 
+        fetchLatestToken().then(token => {
+            if(token) { 
                 localStorage.setItem("cached_yt_token", token);
                 alert("✅ 【PC連携成功】メインPCから最新のトークンを取得し、同期しました");
-            } else { alert("⚠ PCから空の鍵が返されました。スマホ内の既存の鍵を維持します。"); }
+            } else { 
+                alert("⚠ PCから空の鍵が返されました。スマホ内の既存の鍵を維持します。"); 
+            }
             refreshCurrentTabContent();
         })
         .catch(() => {
@@ -873,11 +902,8 @@
 
     function loadYouTubeBroadcasts() {
         const bBadge = document.getElementById('net-badge-control');
-        fetch(PC_TOKEN_URL)
-        .then(res => res.json())
-        .then(tData => {
-            const token = (tData && typeof tData === 'object') ? (tData.token || tData.raw_token || tData.access_token) : tData;
-            if(token && token !== "mock_wait_access_token" && token !== "") { 
+        fetchLatestToken().then(token => {
+            if(token) { 
                 localStorage.setItem("cached_yt_token", token); 
                 if(bBadge) { bBadge.innerText = "PC連携 ONLINE"; bBadge.className = "net-status-badge net-online"; }
             } else {
@@ -1015,9 +1041,9 @@
             const token = (d && typeof d === 'object') ? (d.raw_token || d.token || d.access_token) : d;
             if (token && token !== "mock_wait_access_token" && token !== "") {
                 localStorage.setItem("cached_yt_token", token);
-                if(sBadge) { sBadge.innerText = "PC連携 ONLINE"; sBadge.className = "net-status-badge net-online"; }
+                updateYTBadges(true);
             } else {
-                if(sBadge) { sBadge.innerText = "PC OFFLINE (DIRECT)"; sBadge.className = "net-status-badge net-offline"; }
+                updateYTBadges(false);
             }
             if(!d.success) { container.innerHTML = `<div class="comment-card"><div class="user-text" style="color:#ff4444;">データ取得失敗: ${d.error}</div></div>`; return; }
             
