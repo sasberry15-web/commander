@@ -589,10 +589,14 @@
     }
 
     function isLocalOrigin() {
+        const storedDomain = getStoredDomain();
+        const originLower = CURRENT_ORIGIN.toLowerCase();
         return (
-            CURRENT_ORIGIN.includes("192.168.10.") || 
-            CURRENT_ORIGIN.includes("localhost") || 
-            CURRENT_ORIGIN.includes("127.0.0.1")
+            originLower.includes("192.168.10.") || 
+            originLower.includes("localhost") || 
+            originLower.includes("127.0.0.1") ||
+            originLower.includes("ngrok-free.dev") ||
+            (storedDomain && originLower.includes(storedDomain.toLowerCase()))
         );
     }
 
@@ -724,7 +728,7 @@
             micAlert.innerText = "🎙️ MIC: PC OFFLINE (接続切れ)";
             micAlert.className = "mic-alert-box mute";
             
-            if (!CURRENT_ORIGIN.includes("192.168.10.") && !CURRENT_ORIGIN.includes("localhost") && !CURRENT_ORIGIN.includes("127.0.0.1")) {
+            if (!isLocalOrigin()) {
                 const ngrokBanner = document.getElementById('ngrok-warning');
                 if (ngrokBanner) ngrokBanner.style.display = 'block';
             }
@@ -735,13 +739,9 @@
         const domain = getStoredDomain();
         const password = getStoredPassword();
         
-        // ローカル環境の場合はそのホストをWS接続先として使用、それ以外は保存されたngrok_domainを使用
+        // ローカル環境/直通環境の場合はそのホストをWS接続先として使用、それ以外は保存されたngrok_domainを使用
         let wsHost = domain;
-        if (
-            CURRENT_ORIGIN.includes("192.168.10.") || 
-            CURRENT_ORIGIN.includes("localhost") || 
-            CURRENT_ORIGIN.includes("127.0.0.1")
-        ) {
+        if (isLocalOrigin()) {
             wsHost = window.location.host;
         }
 
