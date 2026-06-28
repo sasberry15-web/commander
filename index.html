@@ -290,6 +290,7 @@
         <div class="nav-tab" id="tab-btn-control" onclick="switchTab('control')">🎙️ ライブ操作</div>
         <div class="nav-tab" id="tab-btn-stats" onclick="switchTab('stats')">📈 チャンネル</div>
         <div class="nav-tab" id="tab-btn-macro" onclick="switchTab('macro')">🎛️ マクロ</div>
+        <div class="nav-tab" id="tab-btn-settings" onclick="switchTab('settings')">⚙️ 設定</div>
     </div>
 
     <div id="panel-status" class="tab-panel active-panel">
@@ -386,6 +387,18 @@
     <div id="panel-settings" class="tab-panel">
         <div class="section-title">⚙️ システム設定</div>
         
+        <div style="background: rgba(0,0,0,0.2); border: 1px solid rgba(0, 255, 255, 0.25); border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 0 10px rgba(0,255,255,0.05);">
+            <div style="font-size: 14px; font-weight: bold; color: #00ffff; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                🚀 本番用 Commander 連携
+            </div>
+            <p style="font-size: 11px; color: rgba(255,255,255,0.6); margin-bottom: 12px; line-height: 1.5;">
+                現在の ngrok 接続認証設定（システムユーザーID・パスワード）を引き継いだ状態で、本番用の <strong>Commander (GitHub Pages版)</strong> を別タブで起動します。設定の手間を省いてすぐに接続できます。
+            </p>
+            <button class="yt-btn" style="width: 100%; padding: 12px; border-color: #00ffff; color: #00ffff; background: rgba(0,255,255,0.05); font-weight: bold; font-size: 13px; border-radius: 6px; cursor: pointer; transition: all 0.2s;" onclick="launchGitHubCommander()">
+                ⚡️ 認証情報を引き継いで本番 Commander を起動
+            </button>
+        </div>
+        
         <div style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255, 170, 68, 0.15); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
             <div style="font-size: 14px; font-weight: bold; color: #ffaa44; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
                 🔑 接続認証セッション管理
@@ -446,13 +459,62 @@
     const MAIN_PC_IP = "192.168.10.103"; 
     const CURRENT_ORIGIN = window.location.origin;
     
+    // URLのクエリパラメータまたはハッシュから接続情報を自動検出して保存（GitHub Pages等とのシームレス連携用）
+    function importCredentialsFromUrl() {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            let domain = params.get('domain');
+            let pass = params.get('pass') || params.get('password');
+            
+            // ハッシュからも抽出を試みる (例: #domain=xxx&pass=yyy)
+            if (!domain || !pass) {
+                const hash = window.location.hash.substring(1);
+                if (hash) {
+                    const hashParams = new URLSearchParams(hash);
+                    if (hashParams.get('domain')) domain = hashParams.get('domain');
+                    if (hashParams.get('pass')) pass = hashParams.get('pass');
+                    if (hashParams.get('password')) pass = hashParams.get('password');
+                }
+            }
+            
+            if (domain) {
+                let clean = decodeURIComponent(domain).replace(/^https?:\/\//i, '').trim();
+                clean = clean.replace(/vias/gi, '').replace(/%20/g, ' ').trim();
+                clean = clean.split(/\s+/)[0].split('/')[0];
+                localStorage.setItem("ngrok_domain", clean);
+            }
+            if (pass) {
+                localStorage.setItem("ngrok_password", decodeURIComponent(pass).trim());
+            }
+            
+            // パラメータ付きのURLを綺麗にするためにハッシュ/クエリをクリア
+            if (domain || pass) {
+                history.replaceState(null, document.title, window.location.pathname);
+            }
+        } catch (e) {
+            console.error("Credentials import error:", e);
+        }
+    }
+    importCredentialsFromUrl();
+
     // 認証情報と接続ドメインをlocalStorageから読み出し、コード上からドメイン名を完全隠蔽化
     function getStoredDomain() {
-        return localStorage.getItem("ngrok_domain") || "";
+        let domain = localStorage.getItem("ngrok_domain") || "";
+        try {
+            domain = decodeURIComponent(domain);
+        } catch(e) {}
+        domain = domain.replace(/vias/gi, '').replace(/%20/g, ' ').trim();
+        domain = domain.split(/\s+/)[0];
+        domain = domain.split('/')[0];
+        return domain;
     }
     
     function getStoredPassword() {
-        return localStorage.getItem("ngrok_password") || "";
+        let pass = localStorage.getItem("ngrok_password") || "";
+        try {
+            pass = decodeURIComponent(pass);
+        } catch(e) {}
+        return pass.trim();
     }
 
     function isLocalOrigin() {
@@ -665,7 +727,10 @@
             return;
         }
         
-        let cleanDomain = domainInput.replace(/^https?:\/\//i, '');
+        let cleanDomain = domainInput.replace(/^https?:\/\//i, '').trim();
+        // スペースが入ってしまっている場合はスペースの前の部分だけを抽出する（例: "domain vias" -> "domain"）
+        cleanDomain = cleanDomain.split(/\s+/)[0];
+        // さらに末尾の / 以降などを除去
         cleanDomain = cleanDomain.split('/')[0];
 
         errDiv.style.display = 'none';
@@ -677,6 +742,18 @@
         
         connectWebSocket();
         updateDashboard();
+    }
+
+    function launchGitHubCommander() {
+        const domain = getStoredDomain();
+        const password = getStoredPassword();
+        if (!domain || !password) {
+            alert("⚠️ 接続認証情報が保存されていません。先にログイン（認証）を行ってください。");
+            return;
+        }
+        
+        const targetUrl = `https://sasberry15-web.github.io/commander/#domain=${encodeURIComponent(domain)}&pass=${encodeURIComponent(password)}`;
+        window.open(targetUrl, '_blank');
     }
 
     function resetLoginCredentials() {
@@ -764,7 +841,10 @@
         const container = document.getElementById('dashboard-nav-container');
         if (!container) return;
         
-        const currentTabs = tabs || ["status", "control", "stats", "macro", "settings"];
+        let currentTabs = tabs ? [...tabs] : ["status", "control", "stats", "macro"];
+        if (!currentTabs.includes("settings")) {
+            currentTabs.push("settings");
+        }
         container.innerHTML = "";
         
         currentTabs.forEach(tabId => {
@@ -799,14 +879,18 @@
     let touchStartX = 0;
     let touchStartY = 0;
     let isMouseDown = false;
+    let ignoreSwipeSession = false;
     
     document.addEventListener('touchstart', (e) => {
+        ignoreSwipeSession = false;
         const activeElem = document.activeElement;
         if (activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA' || activeElem.isContentEditable)) {
+            ignoreSwipeSession = true;
             return;
         }
-        // タブボタンバー（スクロール可能なタブエリア）をスワイプした場合は、タブ切り替えをせずスクロールのみにする
+        // タブボタンバー（スクロール可能なタブエリア）から始まったスワイプは、タブ切り替えをせずスクロールのみにする
         if (e.target.closest('.dashboard-nav') || e.target.closest('#dashboard-nav-container') || e.target.closest('.nav-tab')) {
+            ignoreSwipeSession = true;
             return;
         }
         touchStartX = e.touches[0].clientX;
@@ -814,6 +898,9 @@
     }, { passive: true });
 
     document.addEventListener('touchend', (e) => {
+        if (ignoreSwipeSession) {
+            return;
+        }
         const activeElem = document.activeElement;
         if (activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA' || activeElem.isContentEditable)) {
             return;
@@ -830,14 +917,18 @@
 
     // 🖥️ マウスドラッグによるスワイプエミュレーション
     document.addEventListener('mousedown', (e) => {
+        ignoreSwipeSession = false;
         const activeElem = document.activeElement;
         if (activeElem && (activeElem.tagName === 'INPUT' || activeElem.tagName === 'TEXTAREA' || activeElem.isContentEditable)) {
+            ignoreSwipeSession = true;
             return;
         }
         if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select') || e.target.closest('a') || e.target.closest('.nav-tab')) {
+            ignoreSwipeSession = true;
             return;
         }
         if (e.target.closest('.dashboard-nav') || e.target.closest('#dashboard-nav-container')) {
+            ignoreSwipeSession = true;
             return;
         }
         touchStartX = e.clientX;
@@ -848,6 +939,7 @@
     document.addEventListener('mouseup', (e) => {
         if (!isMouseDown) return;
         isMouseDown = false;
+        if (ignoreSwipeSession) return;
         
         const mouseEndX = e.clientX;
         const mouseEndY = e.clientY;
