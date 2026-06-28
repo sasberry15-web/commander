@@ -252,7 +252,7 @@
 
     <!-- 🔑 ログインモーダル -->
     <div id="login-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 10, 13, 0.96); z-index: 10000; justify-content: center; align-items: center; padding: 20px; font-family: 'Inter', sans-serif;">
-        <div style="background: #0d0d11; border: 2px solid #ffaa44; border-radius: 12px; padding: 30px; width: 100%; max-width: 400px; box-shadow: 0 0 35px rgba(255, 170, 68, 0.2); text-align: center;">
+        <div style="background: #0d0d11; border: 2px solid #ffaa44; border-radius: 12px; padding: 30px; width: 100%; max-width: 420px; box-shadow: 0 0 35px rgba(255, 170, 68, 0.2); text-align: center; box-sizing: border-box; max-height: 95vh; overflow-y: auto;">
             <div style="font-size: 22px; font-weight: bold; color: #ffaa44; margin-bottom: 25px; letter-spacing: 2px; text-shadow: 0 0 10px rgba(255, 170, 68, 0.3);">🔑 RSD SECURITY ACCESS</div>
             
             <div style="text-align: left; margin-bottom: 15px;">
@@ -260,7 +260,7 @@
                 <input type="text" id="login-domain" placeholder="ID-XXXXXXXX" style="width: 100%; background: #050508; border: 1px solid rgba(255, 170, 68, 0.3); border-radius: 6px; color: #fff; padding: 12px; font-size: 14px; outline: none; font-family: 'JetBrains Mono', monospace; box-sizing: border-box;">
             </div>
             
-            <div style="text-align: left; margin-bottom: 25px;">
+            <div style="text-align: left; margin-bottom: 20px;">
                 <label style="font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255, 170, 68, 0.6); display: block; margin-bottom: 6px;">パスワード</label>
                 <input type="password" id="login-pass" placeholder="••••••••" style="width: 100%; background: #050508; border: 1px solid rgba(255, 170, 68, 0.3); border-radius: 6px; color: #fff; padding: 12px; font-size: 14px; outline: none; box-sizing: border-box;">
             </div>
@@ -268,6 +268,34 @@
             <button onclick="submitLogin()" style="width: 100%; background: rgba(255, 170, 68, 0.08); border: 1px solid #ffaa44; color: #ffaa44; font-size: 15px; font-weight: bold; padding: 14px; border-radius: 8px; cursor: pointer; letter-spacing: 1.5px; transition: all 0.2s ease; text-shadow: 0 0 4px rgba(255, 170, 68, 0.3);" onmouseover="this.style.background='rgba(255, 170, 68, 0.15)'" onmouseout="this.style.background='rgba(255, 170, 68, 0.08)'">認証（LOGIN）</button>
             
             <div id="login-error" style="color: #ff4444; font-size: 12px; margin-top: 15px; display: none; font-weight: bold;"></div>
+
+            <!-- 🛠️ ngrok直通許可・Safariトラブルシュートの追加 -->
+            <div style="margin-top: 25px; padding: 12px; background: rgba(255, 170, 68, 0.04); border: 1px dashed rgba(255, 170, 68, 0.25); border-radius: 8px; font-size: 11px; text-align: left;">
+                <div style="font-weight: bold; color: #ffaa44; margin-bottom: 5px; display: flex; align-items: center; gap: 4px;">
+                    ⚠️ 初回ログイン・接続できない場合
+                </div>
+                <div style="color: rgba(255, 255, 255, 0.7); line-height: 1.4; margin-bottom: 10px;">
+                    ngrokの接続制限を解除するため、一度直接ngrokを開き <strong>「Visit Site」</strong>（サイトを訪問する）をクリックする必要があります。
+                </div>
+                <button onclick="openNgrokDirectly()" style="width: 100%; background: rgba(0, 255, 255, 0.08); border: 1px solid #00ffff; color: #00ffff; padding: 10px; font-size: 12px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s; text-shadow: 0 0 4px rgba(0, 255, 255, 0.3);" onmouseover="this.style.background='rgba(0, 255, 255, 0.15)'" onmouseout="this.style.background='rgba(0, 255, 255, 0.08)'">
+                    🔗 直接開いて接続許可する (Visit Site)
+                </button>
+            </div>
+            
+            <div style="margin-top: 15px; text-align: left;">
+                <details style="border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; background: rgba(0,0,0,0.25);">
+                    <summary style="font-size: 11px; color: rgba(255,255,255,0.6); padding: 10px; cursor: pointer; font-weight: bold; outline: none; user-select: none;">
+                        📱 iPhone (Safari) 特有の接続トラブル対策
+                    </summary>
+                    <div style="font-size: 11px; color: rgba(255,255,255,0.7); padding: 12px; border-top: 1px solid rgba(255,255,255,0.1); line-height: 1.5; background: #07070a;">
+                        iPhoneのSafariはセキュリティ（サードパーティCookie・トラッキング制限）が非常に厳しく、ngrokの許可Cookieが遮断されWebSocket接続ができないことがあります。<br><br>
+                        <strong>💡 おすすめ対策1：Chromeアプリを使う</strong><br>
+                        App Store等から <strong>Google Chrome</strong> アプリをインストールし、本ページ（commander）を開き直してください。ChromeはSafariのような厳しいサードパーティ制限に引っかかりにくいため、一発で繋がることが多く最も推奨されます。<br><br>
+                        <strong>💡 対策2：Safariのトラッキング設定を切る</strong><br>
+                        iOSの「設定」アプリを開き、<strong>「Safari」</strong> ＞ <strong>「サイト越えトラッキングを防ぐ」</strong> を <strong>オフ（灰色）</strong> に設定してから、このページを再度開き直してください。
+                    </div>
+                </details>
+            </div>
         </div>
     </div>
 
@@ -742,6 +770,26 @@
         
         connectWebSocket();
         updateDashboard();
+    }
+
+    function openNgrokDirectly() {
+        const domainInput = document.getElementById('login-domain').value.trim();
+        if (!domainInput) {
+            alert("⚠️ 先に「システムユーザーID (USER ID)」の欄に、お使いのngrokドメイン（例: xxxx-xxxx-xxxx.ngrok-free.dev）を入力してください。");
+            return;
+        }
+        let cleanDomain = domainInput.replace(/^https?:\/\//i, '').trim();
+        // %20やviasなどの不要文字をクリーンアップ
+        cleanDomain = cleanDomain.replace(/vias/gi, '').replace(/%20/g, ' ').trim();
+        cleanDomain = cleanDomain.split(/\s+/)[0].split('/')[0];
+        
+        if (!cleanDomain.includes('.') || cleanDomain.length < 5) {
+            alert("⚠️ 入力されたユーザーIDが正しくありません。ngrokのドメイン（例: xxxx.ngrok-free.dev）を入力してください。");
+            return;
+        }
+        
+        const targetUrl = `https://${cleanDomain}`;
+        window.open(targetUrl, '_blank');
     }
 
     function launchGitHubCommander() {
