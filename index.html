@@ -310,32 +310,12 @@
             
             <div id="login-error" style="color: #ff4444; font-size: 12px; margin-top: 15px; display: none; font-weight: bold;"></div>
 
-            <!-- 🛠️ ngrok直通許可・Safariトラブルシュートの追加 -->
-            <div style="margin-top: 25px; padding: 12px; background: rgba(255, 170, 68, 0.04); border: 1px dashed rgba(255, 170, 68, 0.25); border-radius: 8px; font-size: 11px; text-align: left;">
-                <div style="font-weight: bold; color: #ffaa44; margin-bottom: 5px; display: flex; align-items: center; gap: 4px;">
-                    ⚠️ 初回ログイン・接続できない場合
-                </div>
-                <div style="color: rgba(255, 255, 255, 0.7); line-height: 1.4; margin-bottom: 10px;">
-                    ngrokの接続制限を解除するため、一度直接ngrokを開き <strong>「Visit Site」</strong>（サイトを訪問する）をクリックする必要があります。
-                </div>
-                <button onclick="openNgrokDirectly()" style="width: 100%; background: rgba(0, 255, 255, 0.08); border: 1px solid #00ffff; color: #00ffff; padding: 10px; font-size: 12px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s; text-shadow: 0 0 4px rgba(0, 255, 255, 0.3);" onmouseover="this.style.background='rgba(0, 255, 255, 0.15)'" onmouseout="this.style.background='rgba(0, 255, 255, 0.08)'">
-                    🔗 直接開いて接続許可する (Visit Site)
-                </button>
-            </div>
-            
-            <div style="margin-top: 15px; text-align: left;">
-                <details style="border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; background: rgba(0,0,0,0.25);">
-                    <summary style="font-size: 11px; color: rgba(255,255,255,0.6); padding: 10px; cursor: pointer; font-weight: bold; outline: none; user-select: none;">
-                        📱 iPhone (Safari) 特有の接続トラブル対策
-                    </summary>
-                    <div style="font-size: 11px; color: rgba(255,255,255,0.7); padding: 12px; border-top: 1px solid rgba(255,255,255,0.1); line-height: 1.5; background: #07070a;">
-                        iPhoneのSafariはセキュリティ（サードパーティCookie・トラッキング制限）が非常に厳しく、ngrokの許可Cookieが遮断されWebSocket接続ができないことがあります。<br><br>
-                        <strong>💡 おすすめ対策1：Chromeアプリを使う</strong><br>
-                        App Store等から <strong>Google Chrome</strong> アプリをインストールし、本ページ（commander）を開き直してください。ChromeはSafariのような厳しいサードパーティ制限に引っかかりにくいため、一発で繋がることが多く最も推奨されます。<br><br>
-                        <strong>💡 対策2：Safariのトラッキング設定を切る</strong><br>
-                        iOSの「設定」アプリを開き、<strong>「Safari」</strong> ＞ <strong>「サイト越えトラッキングを防ぐ」</strong> を <strong>オフ（灰色）</strong> に設定してから、このページを再度開き直してください。
-                    </div>
-                </details>
+            <!-- 💡 接続ヒント -->
+            <div style="margin-top: 20px; padding: 12px; background: rgba(255, 170, 68, 0.04); border: 1px dashed rgba(255, 170, 68, 0.25); border-radius: 8px; font-size: 11px; text-align: left; color: rgba(255, 255, 255, 0.7); line-height: 1.5;">
+                <div style="font-weight: bold; color: #ffaa44; margin-bottom: 5px;">💡 ログインのヒント</div>
+                ・<b>ユーザーID：</b>お使いの ngrok 無料固定ドメインを入力してください。<br>
+                ・<b>パスワード：</b>コンソールで設定した「自前アクセスパスワード（デフォルト: vias_secure_999）」を入力してください。<br>
+                ※ngrokの前置Basic認証を解除したため、現在はiPhoneやSafariでも快適に標準ログインが動作します。
             </div>
         </div>
     </div>
@@ -473,7 +453,7 @@
                         📱 iOS / Safari 互換モード
                     </div>
                     <div style="font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 2px; line-height: 1.3;">
-                        iPhoneやSafari等で、WebSocket接続時の「ngrok/基本認証ポップアップ」が無限にループするのを防ぐために、通信を安定した高速HTTPポーリング（2秒間隔）へ固定します。
+                        ※ngrokベーシック認証の解除により、現在はiPhone/Safariでも超低遅延WebSocket接続が標準動作します。回線制限等の特殊な状況で接続が極度に不安定な場合のみ、手動でONにして高速HTTPポーリング（2秒間隔）へ固定してください。
                     </div>
                 </div>
                 <label class="switch" style="position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0;">
@@ -727,9 +707,15 @@
         try {
             const response = await originalFetch(url, options);
             if (response.status === 401) {
-                console.warn("🔒 [Unauthorized] Secure fetch returned 401. Password may be wrong.");
+                console.warn("🔒 [Unauthorized] Secure fetch returned 401. Password may be wrong. Showing login UI.");
                 isAuthError = true;
                 updateConnectionStatusUI();
+                showLoginModal();
+                const errDiv = document.getElementById('login-error');
+                if (errDiv) {
+                    errDiv.innerText = "⚠️ ユーザーIDまたはパスワードが正しくありません。お使いのCommanderサーバーのアクセスパスワードを確認してください。";
+                    errDiv.style.display = 'block';
+                }
             } else if (response.status === 200) {
                 if (isAuthError) {
                     isAuthError = false;
@@ -750,11 +736,11 @@
         return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     }
 
-    // iOS互換モードの取得・設定（デフォルトはiOSならtrue、それ以外は保存値またはfalse）
+    // iOS互換モードの取得・設定（デフォルトはWebSocketを稼働させるため常にfalse）
     function getIosCompatibilityMode() {
         const stored = localStorage.getItem("ios_compatibility_mode");
         if (stored === null) {
-            return isIOS(); // 初回はiOSなら自動的にON
+            return false; // デフォルトはWebSocketを使用するために常にfalseにします
         }
         return stored === "true";
     }
