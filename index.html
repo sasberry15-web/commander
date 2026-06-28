@@ -487,6 +487,34 @@
     const MAIN_PC_IP = "192.168.10.103"; 
     const CURRENT_ORIGIN = window.location.origin;
     
+    // ドメイン入力を徹底的に安全にするヘルパー関数 (デコード、viasや%20、余計な空白を完全にクレンジング)
+    function cleanInputDomain(domainStr) {
+        if (!domainStr) return "";
+        let clean = domainStr.trim();
+        try {
+            // 何度か二重エンコードされている可能性も考慮して完全にデコード
+            clean = decodeURIComponent(clean);
+            clean = decodeURIComponent(clean);
+        } catch(e) {}
+        
+        // URLスキームの除去
+        clean = clean.replace(/^https?:\/\//i, '').trim();
+        
+        // vias（大文字小文字問わず）の除去
+        clean = clean.replace(/vias/gi, '');
+        
+        // %20や色々なスペース、URL用の余計なエンコードをクリア
+        clean = clean.replace(/%20/g, ' ');
+        
+        // 空白文字での分割（スペースの前の部分だけを抽出。例："domain vias" -> "domain"）
+        clean = clean.split(/\s+/)[0];
+        
+        // パスやクエリの除去 (スラッシュ以降)
+        clean = clean.split('/')[0];
+        
+        return clean.trim();
+    }
+
     // URLのクエリパラメータまたはハッシュから接続情報を自動検出して保存（GitHub Pages等とのシームレス連携用）
     function importCredentialsFromUrl() {
         try {
@@ -506,13 +534,17 @@
             }
             
             if (domain) {
-                let clean = decodeURIComponent(domain).replace(/^https?:\/\//i, '').trim();
-                clean = clean.replace(/vias/gi, '').replace(/%20/g, ' ').trim();
-                clean = clean.split(/\s+/)[0].split('/')[0];
-                localStorage.setItem("ngrok_domain", clean);
+                const clean = cleanInputDomain(domain);
+                if (clean) {
+                    localStorage.setItem("ngrok_domain", clean);
+                }
             }
             if (pass) {
-                localStorage.setItem("ngrok_password", decodeURIComponent(pass).trim());
+                let cleanPass = pass.trim();
+                try {
+                    cleanPass = decodeURIComponent(cleanPass);
+                } catch(e) {}
+                localStorage.setItem("ngrok_password", cleanPass.trim());
             }
             
             // パラメータ付きのURLを綺麗にするためにハッシュ/クエリをクリア
@@ -525,16 +557,13 @@
     }
     importCredentialsFromUrl();
 
+    // 💡 接続健全性(Health)追跡用のステータス管理
+    let lastSuccessfulFetchTime = 0; // 最後にHTTPポーリング（データフェッチ）が成功した時刻
+    let wsConsecutiveFailures = 0;  // WebSocket連続接続失敗（切断）回数
+
     // 認証情報と接続ドメインをlocalStorageから読み出し、コード上からドメイン名を完全隠蔽化
     function getStoredDomain() {
-        let domain = localStorage.getItem("ngrok_domain") || "";
-        try {
-            domain = decodeURIComponent(domain);
-        } catch(e) {}
-        domain = domain.replace(/vias/gi, '').replace(/%20/g, ' ').trim();
-        domain = domain.split(/\s+/)[0];
-        domain = domain.split('/')[0];
-        return domain;
+        return cleanInputDomain(localStorage.getItem("ngrok_domain") || "");
     }
     
     function getStoredPassword() {
@@ -643,6 +672,32 @@
     let ws = null;
     let wsReconnectTimeout = null;
 
+    function updateConnectionStatusUI() {
+        const micAlert = document.getElementById('mic-alert');
+        if (!micAlert) return;
+        
+        const isWsOpen = ws && ws.readyState === WebSocket.OPEN;
+        const isHttpHealthy = (Date.now() - lastSuccessfulFetchTime < 6000); // 直近6秒以内にフェッチが成功しているか
+        
+        if (isWsOpen || isHttpHealthy) {
+            const ngrokBanner = document.getElementById('ngrok-warning');
+            if (ngrokBanner) ngrokBanner.style.display = 'none';
+            
+            if (micAlert.innerText.includes("PC OFFLINE")) {
+                micAlert.innerText = "🎙️ MIC: PC ONLINE (接続中)";
+                micAlert.className = "mic-alert-box";
+            }
+        } else {
+            micAlert.innerText = "🎙️ MIC: PC OFFLINE (接続切れ)";
+            micAlert.className = "mic-alert-box mute";
+            
+            if (!CURRENT_ORIGIN.includes("192.168.10.") && !CURRENT_ORIGIN.includes("localhost") && !CURRENT_ORIGIN.includes("127.0.0.1")) {
+                const ngrokBanner = document.getElementById('ngrok-warning');
+                if (ngrokBanner) ngrokBanner.style.display = 'block';
+            }
+        }
+    }
+
     function connectWebSocket() {
         const domain = getStoredDomain();
         const password = getStoredPassword();
@@ -678,10 +733,10 @@
 
         ws.onopen = () => {
             console.log("🟢 WebSocket Connected!");
-            const ngrokBanner = document.getElementById('ngrok-warning');
-            if (ngrokBanner) ngrokBanner.style.display = 'none';
+            wsConsecutiveFailures = 0; // 接続成功でリセット
             
-            stopDashboardPolling();
+            updateConnectionStatusUI();
+            stopDashboardPolling(); // WebSocketが健康なのでHTTPポーリングを停止
         };
 
         ws.onmessage = (event) => {
@@ -709,23 +764,29 @@
         };
 
         ws.onclose = (event) => {
-            console.log("🔴 WebSocket Closed. Reconnecting in 3s...", event.reason);
-            if (wsReconnectTimeout) clearTimeout(wsReconnectTimeout);
-            wsReconnectTimeout = setTimeout(connectWebSocket, 3000);
+            wsConsecutiveFailures++;
+            console.log(`🔴 WebSocket Closed (Failure Count: ${wsConsecutiveFailures}). Info:`, event.reason);
             
-            const micAlert = document.getElementById('mic-alert');
-            if (micAlert) {
-                micAlert.innerText = "🎙️ MIC: PC OFFLINE (接続切れ)";
-                micAlert.className = "mic-alert-box mute";
+            if (wsReconnectTimeout) clearTimeout(wsReconnectTimeout);
+            
+            // 💡 スマート・フォールバック判定
+            // 2回以上連続でWebSocketが切断された場合、別オリジン（GitHub Pages等）でのセキュリティ制限を考慮し、
+            // 安定したHTTP高速ポーリングをバックグラウンドで走らせ、WSS再接続はクールダウン（30秒間隔）へ移行します
+            if (wsConsecutiveFailures >= 2) {
+                console.warn("⚠️ WebSocket connection restricted or unstable in this environment. Falling back to HTTP Polling (Super-Fast Mode).");
+                startDashboardPolling(); // HTTPポーリングをフル稼働
+                wsReconnectTimeout = setTimeout(connectWebSocket, 30000); // クールダウン時間（30秒）
+            } else {
+                wsReconnectTimeout = setTimeout(connectWebSocket, 3000); // 通常の再接続（3秒）
             }
+            
+            updateConnectionStatusUI();
         };
 
         ws.onerror = (error) => {
             console.error("⚠️ WebSocket Error: ", error);
-            if (!CURRENT_ORIGIN.includes("192.168.10.") && !CURRENT_ORIGIN.includes("localhost") && !CURRENT_ORIGIN.includes("127.0.0.1")) {
-                const ngrokBanner = document.getElementById('ngrok-warning');
-                if (ngrokBanner) ngrokBanner.style.display = 'block';
-            }
+            // エラー時もステータス更新を呼び出す
+            updateConnectionStatusUI();
         };
     }
 
@@ -755,11 +816,12 @@
             return;
         }
         
-        let cleanDomain = domainInput.replace(/^https?:\/\//i, '').trim();
-        // スペースが入ってしまっている場合はスペースの前の部分だけを抽出する（例: "domain vias" -> "domain"）
-        cleanDomain = cleanDomain.split(/\s+/)[0];
-        // さらに末尾の / 以降などを除去
-        cleanDomain = cleanDomain.split('/')[0];
+        const cleanDomain = cleanInputDomain(domainInput);
+        if (!cleanDomain || !cleanDomain.includes('.') || cleanDomain.length < 5) {
+            errDiv.innerText = "⚠️ 入力されたユーザーIDが正しくありません。ngrokのドメインを入力してください。";
+            errDiv.style.display = 'block';
+            return;
+        }
 
         errDiv.style.display = 'none';
         
@@ -778,10 +840,7 @@
             alert("⚠️ 先に「システムユーザーID (USER ID)」の欄に、お使いのngrokドメイン（例: xxxx-xxxx-xxxx.ngrok-free.dev）を入力してください。");
             return;
         }
-        let cleanDomain = domainInput.replace(/^https?:\/\//i, '').trim();
-        // %20やviasなどの不要文字をクリーンアップ
-        cleanDomain = cleanDomain.replace(/vias/gi, '').replace(/%20/g, ' ').trim();
-        cleanDomain = cleanDomain.split(/\s+/)[0].split('/')[0];
+        const cleanDomain = cleanInputDomain(domainInput);
         
         if (!cleanDomain.includes('.') || cleanDomain.length < 5) {
             alert("⚠️ 入力されたユーザーIDが正しくありません。ngrokのドメイン（例: xxxx.ngrok-free.dev）を入力してください。");
@@ -1910,9 +1969,9 @@
         .then(data => { 
             cachedData = data; 
             
-            // 接続に成功したので ngrok 警告バナーを非表示にする
-            const ngrokBanner = document.getElementById('ngrok-warning');
-            if (ngrokBanner) ngrokBanner.style.display = 'none';
+            // 💡 HTTPフェッチ成功時刻を記録
+            lastSuccessfulFetchTime = Date.now();
+            updateConnectionStatusUI();
             
             // ポーリングによるデータ更新の際、コンソールで編集中の一時同期データがあればそちらを優先（巻き戻り防止）
             let activeTabs = data.tabs;
@@ -1931,14 +1990,9 @@
             applyUiTheme(activeUiTheme);
         })
         .catch(err => {
-            // 外部サーバー（GitHub Pages等）から開いていて、かつ接続に失敗した場合は、ngrok開通未承認の可能性が高いため警告を出す
-            if (!CURRENT_ORIGIN.includes("192.168.10.") && !CURRENT_ORIGIN.includes("localhost") && !CURRENT_ORIGIN.includes("127.0.0.1")) {
-                const ngrokBanner = document.getElementById('ngrok-warning');
-                if (ngrokBanner) ngrokBanner.style.display = 'block';
-            }
-
-            document.getElementById('mic-alert').innerText = "🎙️ MIC: PC OFFLINE (接続切れ)";
-            document.getElementById('mic-alert').className = "mic-alert-box mute";
+            console.error("Dashboard polling error:", err);
+            // エラー時も共通ステータス更新関数を使って、正しく判定
+            updateConnectionStatusUI();
         });
     }
     
