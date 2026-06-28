@@ -249,6 +249,27 @@
 </head>
 <body>
 
+    <!-- 🔑 ログインモーダル -->
+    <div id="login-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 10, 13, 0.96); z-index: 10000; justify-content: center; align-items: center; padding: 20px; font-family: 'Inter', sans-serif;">
+        <div style="background: #0d0d11; border: 2px solid #ffaa44; border-radius: 12px; padding: 30px; width: 100%; max-width: 400px; box-shadow: 0 0 35px rgba(255, 170, 68, 0.2); text-align: center;">
+            <div style="font-size: 22px; font-weight: bold; color: #ffaa44; margin-bottom: 25px; letter-spacing: 2px; text-shadow: 0 0 10px rgba(255, 170, 68, 0.3);">🔑 RSD SECURITY ACCESS</div>
+            
+            <div style="text-align: left; margin-bottom: 15px;">
+                <label style="font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255, 170, 68, 0.6); display: block; margin-bottom: 6px;">システムユーザーID (USER ID)</label>
+                <input type="text" id="login-domain" placeholder="ID-XXXXXXXX" style="width: 100%; background: #050508; border: 1px solid rgba(255, 170, 68, 0.3); border-radius: 6px; color: #fff; padding: 12px; font-size: 14px; outline: none; font-family: 'JetBrains Mono', monospace; box-sizing: border-box;">
+            </div>
+            
+            <div style="text-align: left; margin-bottom: 25px;">
+                <label style="font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255, 170, 68, 0.6); display: block; margin-bottom: 6px;">パスワード</label>
+                <input type="password" id="login-pass" placeholder="••••••••" style="width: 100%; background: #050508; border: 1px solid rgba(255, 170, 68, 0.3); border-radius: 6px; color: #fff; padding: 12px; font-size: 14px; outline: none; box-sizing: border-box;">
+            </div>
+            
+            <button onclick="submitLogin()" style="width: 100%; background: rgba(255, 170, 68, 0.08); border: 1px solid #ffaa44; color: #ffaa44; font-size: 15px; font-weight: bold; padding: 14px; border-radius: 8px; cursor: pointer; letter-spacing: 1.5px; transition: all 0.2s ease; text-shadow: 0 0 4px rgba(255, 170, 68, 0.3);" onmouseover="this.style.background='rgba(255, 170, 68, 0.15)'" onmouseout="this.style.background='rgba(255, 170, 68, 0.08)'">認証（LOGIN）</button>
+            
+            <div id="login-error" style="color: #ff4444; font-size: 12px; margin-top: 15px; display: none; font-weight: bold;"></div>
+        </div>
+    </div>
+
     <!-- ngrok初回開通警告バナー -->
     <div id="ngrok-warning" class="ngrok-warning-banner">
         <h4>⚠️ ngrok接続の初回承認が必要です</h4>
@@ -394,26 +415,206 @@
 
     // URL設定。ローカル実行時とプレビュー時を自動判定してフォールバック
     const MAIN_PC_IP = "192.168.10.103"; 
-    const NGROK_URL = "https://straggler-verbose-doorstop.ngrok-free.dev";
     const CURRENT_ORIGIN = window.location.origin;
     
-    // APIサーバーのベースURLを自動解決。
-    // 1. ローカルIP、localhost、127.0.0.1、またはngrok経由で直接開かれている場合は、そのoriginをそのまま使う
-    // 2. それ以外の外部サーバー（GitHub Pagesなど）から開かれた場合は、HTTPS接続維持（Mixed Content回避）のためngrokドメインを使用
-    const API_BASE_URL = (
-        CURRENT_ORIGIN.includes("192.168.10.") || 
-        CURRENT_ORIGIN.includes("localhost") || 
-        CURRENT_ORIGIN.includes("127.0.0.1") ||
-        CURRENT_ORIGIN.includes("ngrok-free.dev")
-    )
-        ? CURRENT_ORIGIN 
-        : NGROK_URL;
+    // 認証情報と接続ドメインをlocalStorageから読み出し、コード上からドメイン名を完全隠蔽化
+    function getStoredDomain() {
+        return localStorage.getItem("ngrok_domain") || "";
+    }
+    
+    function getStoredPassword() {
+        return localStorage.getItem("ngrok_password") || "";
+    }
+    
+    // APIサーバーのベースURLを動的解決
+    function getApiBaseUrl() {
+        if (
+            CURRENT_ORIGIN.includes("192.168.10.") || 
+            CURRENT_ORIGIN.includes("localhost") || 
+            CURRENT_ORIGIN.includes("127.0.0.1") ||
+            CURRENT_ORIGIN.includes("ngrok-free.dev")
+        ) {
+            return CURRENT_ORIGIN;
+        }
+        const domain = getStoredDomain();
+        return domain ? `https://${domain}` : "";
+    }
 
-    const PC_DATA_URL = `${API_BASE_URL}/api/data`;
-    const PC_TOKEN_URL = `${API_BASE_URL}/api/youtube-token`; 
-    const PC_STATS_URL = `${API_BASE_URL}/api/youtube-stats`;
-    const PC_MIC_URL = `${API_BASE_URL}/api/toggle-mic`;
-    const PC_SCENE_URL = `${API_BASE_URL}/api/obs-scene`;
+    // 各種APIエンドポイントの動的解決ゲッター
+    const PC_DATA_URL = `${getApiBaseUrl()}/api/data`; // 既存のポーリングフォールバック用にグローバルに宣言
+    function getPcTokenUrl() { return `${getApiBaseUrl()}/api/youtube-token`; }
+    function getPcStatsUrl() { return `${getApiBaseUrl()}/api/youtube-stats`; }
+    function getPcMicUrl() { return `${getApiBaseUrl()}/api/toggle-mic`; }
+    function getPcSceneUrl() { return `${getApiBaseUrl()}/api/obs-scene`; }
+
+    // Basic Auth認証ヘッダーの生成
+    function getAuthHeader() {
+        const password = getStoredPassword();
+        if (!password) return {};
+        // ユーザーIDはドメイン名、パスワードは基本認証パス、Basic Authのユーザーは admin 固定
+        return { "Authorization": "Basic " + btoa("admin:" + password) };
+    }
+
+    // 認証ヘッダーを自動付随するセキュアfetchラッパー
+    async function secureFetch(url, options = {}) {
+        options.headers = options.headers || {};
+        
+        const auth = getAuthHeader();
+        if (auth.Authorization) {
+            if (options.headers instanceof Headers) {
+                options.headers.set("Authorization", auth.Authorization);
+                options.headers.set("ngrok-skip-browser-warning", "any");
+            } else if (Array.isArray(options.headers)) {
+                const hasAuth = options.headers.some(h => h[0].toLowerCase() === 'authorization');
+                if (!hasAuth) {
+                    options.headers.push(["Authorization", auth.Authorization]);
+                }
+                const hasSkip = options.headers.some(h => h[0].toLowerCase() === 'ngrok-skip-browser-warning');
+                if (!hasSkip) {
+                    options.headers.push(["ngrok-skip-browser-warning", "any"]);
+                }
+            } else {
+                options.headers["Authorization"] = auth.Authorization;
+                options.headers["ngrok-skip-browser-warning"] = "any";
+            }
+        } else {
+            if (!(options.headers instanceof Headers) && !Array.isArray(options.headers)) {
+                options.headers["ngrok-skip-browser-warning"] = "any";
+            }
+        }
+        
+        return originalFetch(url, options);
+    }
+
+    // 🔌 WebSocket 接続管理
+    let ws = null;
+    let wsReconnectTimeout = null;
+
+    function connectWebSocket() {
+        const domain = getStoredDomain();
+        const password = getStoredPassword();
+        
+        // ローカル環境の場合はそのホストをWS接続先として使用、それ以外は保存されたngrok_domainを使用
+        let wsHost = domain;
+        if (
+            CURRENT_ORIGIN.includes("192.168.10.") || 
+            CURRENT_ORIGIN.includes("localhost") || 
+            CURRENT_ORIGIN.includes("127.0.0.1")
+        ) {
+            wsHost = window.location.host;
+        }
+
+        if (!wsHost) {
+            console.log("⚠️ No domain config found, showing login modal.");
+            showLoginModal();
+            return;
+        }
+
+        if (ws) {
+            try { ws.close(); } catch(e) {}
+        }
+
+        const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
+        // 🔒 セキュリティ認証情報をブラウザ制限に抵触しないクエリパラメータで渡す (ws://host/ws?auth=password)
+        const wsUrl = password 
+            ? `${wsProto}//${wsHost}/ws?auth=${encodeURIComponent(password)}`
+            : `${wsProto}//${wsHost}/ws`;
+
+        console.log(`🔌 Connecting to WebSocket: ${wsProto}//${wsHost}/ws?[SECURE_AUTH_PARAM]`);
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+            console.log("🟢 WebSocket Connected!");
+            const ngrokBanner = document.getElementById('ngrok-warning');
+            if (ngrokBanner) ngrokBanner.style.display = 'none';
+            
+            stopDashboardPolling();
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                cachedData = data;
+                
+                let activeTabs = data.tabs;
+                let activeMacros = data.macros;
+                let activeUiTheme = data.ui_theme;
+                
+                if (latestConsoleSyncConfig) {
+                    if (latestConsoleSyncConfig.tabs) activeTabs = latestConsoleSyncConfig.tabs;
+                    if (latestConsoleSyncConfig.macros) activeMacros = latestConsoleSyncConfig.macros;
+                    if (latestConsoleSyncConfig.ui_theme) activeUiTheme = latestConsoleSyncConfig.ui_theme;
+                }
+                
+                renderTabs(activeTabs);
+                renderStats(); 
+                renderMacroDeck(activeMacros, activeUiTheme);
+                applyUiTheme(activeUiTheme);
+            } catch (e) {
+                console.error("WS parse error: ", e);
+            }
+        };
+
+        ws.onclose = (event) => {
+            console.log("🔴 WebSocket Closed. Reconnecting in 3s...", event.reason);
+            if (wsReconnectTimeout) clearTimeout(wsReconnectTimeout);
+            wsReconnectTimeout = setTimeout(connectWebSocket, 3000);
+            
+            const micAlert = document.getElementById('mic-alert');
+            if (micAlert) {
+                micAlert.innerText = "🎙️ MIC: PC OFFLINE (接続切れ)";
+                micAlert.className = "mic-alert-box mute";
+            }
+        };
+
+        ws.onerror = (error) => {
+            console.error("⚠️ WebSocket Error: ", error);
+            if (!CURRENT_ORIGIN.includes("192.168.10.") && !CURRENT_ORIGIN.includes("localhost") && !CURRENT_ORIGIN.includes("127.0.0.1")) {
+                const ngrokBanner = document.getElementById('ngrok-warning');
+                if (ngrokBanner) ngrokBanner.style.display = 'block';
+            }
+        };
+    }
+
+    // 🔑 ログイン管理ロジック
+    function showLoginModal() {
+        const modal = document.getElementById('login-modal');
+        if (modal) {
+            modal.style.display = 'flex';
+            document.getElementById('login-domain').value = getStoredDomain();
+            document.getElementById('login-pass').value = getStoredPassword();
+        }
+    }
+
+    function hideLoginModal() {
+        const modal = document.getElementById('login-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function submitLogin() {
+        const domainInput = document.getElementById('login-domain').value.trim();
+        const passInput = document.getElementById('login-pass').value.trim();
+        const errDiv = document.getElementById('login-error');
+        
+        if (!domainInput) {
+            errDiv.innerText = "⚠️ システムユーザーIDを入力してください。";
+            errDiv.style.display = 'block';
+            return;
+        }
+        
+        let cleanDomain = domainInput.replace(/^https?:\/\//i, '');
+        cleanDomain = cleanDomain.split('/')[0];
+
+        errDiv.style.display = 'none';
+        
+        localStorage.setItem("ngrok_domain", cleanDomain);
+        localStorage.setItem("ngrok_password", passInput);
+        
+        hideLoginModal();
+        
+        connectWebSocket();
+        updateDashboard();
+    }
 
     let currentPC = 'main'; let cachedData = null; let toggleTimeout = null; let activeTab = 'status';
     let wakeLock = null;
@@ -612,7 +813,7 @@
 
     async function fetchLatestToken() {
         try {
-            const res = await fetch(PC_TOKEN_URL);
+            const res = await secureFetch(getPcTokenUrl());
             const tData = await res.json();
             let token = (tData && typeof tData === 'object') ? (tData.token || tData.raw_token || tData.access_token) : tData;
             if (token && token !== "mock_wait_access_token" && token !== "") {
@@ -623,7 +824,7 @@
         }
         
         try {
-            const res = await fetch(PC_STATS_URL);
+            const res = await secureFetch(getPcStatsUrl());
             const d = await res.json();
             const token = (d && typeof d === 'object') ? (d.raw_token || d.token || d.access_token) : d;
             if (token && token !== "mock_wait_access_token" && token !== "") {
@@ -731,7 +932,7 @@
             cachedData.current_scene = sceneName;
             renderObsScenes(cachedData.obs_scenes, sceneName);
         }
-        fetch(PC_SCENE_URL, {
+        secureFetch(getPcSceneUrl(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sceneName: sceneName })
@@ -988,7 +1189,7 @@
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        fetch(`${API_BASE_URL}/api/chat`, {
+        secureFetch(`${getApiBaseUrl()}/api/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ chat_id: chatId, message: msg }),
@@ -1103,7 +1304,7 @@
     function toggleMicMute() {
         if (cachedData && cachedData.obs_status_class === 'silent') { return; }
         def_wakeUpPhoneShield();
-        fetch(PC_MIC_URL, { method: 'POST' }).then(() => { setTimeout(updateDashboard, 100); });
+        secureFetch(getPcMicUrl(), { method: 'POST' }).then(() => { setTimeout(updateDashboard, 100); });
     }
     function triggerToggleLit() {
         const btn = document.getElementById('pc-toggle-btn'); btn.classList.add('lit');
@@ -1420,7 +1621,7 @@
                 
                 // 🚀 マクロ実行APIへ直撃通信
                 btn.onclick = () => {
-                    fetch(`${API_BASE_URL}/api/execute-macro`, {
+                    secureFetch(`${getApiBaseUrl()}/api/execute-macro`, {
                         method: "POST",
                         body: JSON.stringify({ type: m.type, value: m.value })
                     }).catch(() => {});
@@ -1465,13 +1666,14 @@
 
 
     function updateDashboard() {
-        // ngrok 警告リンクの更新
+        // ngrok 警告リンク of course...
         const ngrokWarningLink = document.getElementById('ngrok-btn-link');
-        if (ngrokWarningLink && ngrokWarningLink.getAttribute('href') !== NGROK_URL) {
-            ngrokWarningLink.setAttribute('href', NGROK_URL);
+        const domain = getStoredDomain();
+        if (ngrokWarningLink && domain && ngrokWarningLink.getAttribute('href') !== `https://${domain}`) {
+            ngrokWarningLink.setAttribute('href', `https://${domain}`);
         }
 
-        fetch(PC_DATA_URL)
+        secureFetch(getPcDataUrl())
         .then(response => {
             if (!response.ok) {
                 throw new Error("HTTP error: " + response.status);
@@ -1521,8 +1723,17 @@
     forceRenewTokenSilent();
     initAccordions();
     switchPC('main');
-    updateDashboard();
-    startDashboardPolling();
+    
+    // 🔌 WebSocket接続および動的ロードのキック
+    const initDomain = getStoredDomain();
+    const initPassword = getStoredPassword();
+    if (!initDomain || !initPassword) {
+        showLoginModal();
+    } else {
+        connectWebSocket();
+        updateDashboard();
+    }
+    
     setInterval(forceRenewTokenSilent, 1800000);
     </script>
 </body>
