@@ -415,6 +415,20 @@
     <div id="panel-settings" class="tab-panel">
         <div class="section-title">⚙️ システム設定</div>
         
+        <!-- 📡 リアルタイム通信ステータス表示 -->
+        <div style="background: rgba(0,0,0,0.2); border: 1px solid rgba(0, 255, 255, 0.25); border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 0 10px rgba(0,255,255,0.05);">
+            <div style="font-size: 14px; font-weight: bold; color: #00ffff; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                📡 リアルタイム通信ステータス
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 10px 12px; margin-bottom: 10px;">
+                <span style="font-size: 12px; color: rgba(255,255,255,0.7);">現在の通信方式:</span>
+                <span id="comm-mode-badge" class="net-status-badge" style="background: #ffaa44; color: #0d0d11; font-weight: bold; padding: 2px 8px; border-radius: 4px; font-size: 11px;">判定中...</span>
+            </div>
+            <p style="font-size: 11px; color: rgba(255,255,255,0.6); line-height: 1.5; margin: 0;">
+                WebSocket(WSS)接続が可能な場合は、超低遅延で常時接続双方向通信を行います。セキュリティ制限やブラウザ環境（Safari/Edge等）でWebSocketが遮断された場合は、自動的に超高速HTTPポーリング通信へ切り替わり、ダッシュボード操作を維持します。
+            </p>
+        </div>
+        
         <div style="background: rgba(0,0,0,0.2); border: 1px solid rgba(0, 255, 255, 0.25); border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 0 10px rgba(0,255,255,0.05);">
             <div style="font-size: 14px; font-weight: bold; color: #00ffff; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
                 🚀 本番用 Commander 連携
@@ -674,10 +688,29 @@
 
     function updateConnectionStatusUI() {
         const micAlert = document.getElementById('mic-alert');
-        if (!micAlert) return;
+        const commBadge = document.getElementById('comm-mode-badge');
         
         const isWsOpen = ws && ws.readyState === WebSocket.OPEN;
         const isHttpHealthy = (Date.now() - lastSuccessfulFetchTime < 6000); // 直近6秒以内にフェッチが成功しているか
+        
+        // 設定タブ内の通信方式バッジの更新
+        if (commBadge) {
+            if (isWsOpen) {
+                commBadge.innerText = "🔌 WebSocket (常時接続)";
+                commBadge.style.background = "#00ffff"; // シアン
+                commBadge.style.color = "#0d0d11";
+            } else if (isHttpHealthy) {
+                commBadge.innerText = "📡 HTTP Polling (高速定期フェッチ)";
+                commBadge.style.background = "#ffaa44"; // オレンジ
+                commBadge.style.color = "#0d0d11";
+            } else {
+                commBadge.innerText = "🔴 OFFLINE (接続切断中)";
+                commBadge.style.background = "#ff4444"; // 赤
+                commBadge.style.color = "#ffffff";
+            }
+        }
+        
+        if (!micAlert) return;
         
         if (isWsOpen || isHttpHealthy) {
             const ngrokBanner = document.getElementById('ngrok-warning');
