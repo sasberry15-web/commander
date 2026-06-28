@@ -35,7 +35,8 @@
             display: none; /* Chrome/Safari非表示 */
         }
         .nav-tab {
-            flex: 1;
+            flex: 0 0 auto;
+            min-width: 90px;
             background: #000000;
             border: 1px solid rgba(255, 136, 0, 0.12);
             color: rgba(255, 170, 68, 0.35);
@@ -382,6 +383,34 @@
         </div>
     </div>
 
+    <div id="panel-settings" class="tab-panel">
+        <div class="section-title">⚙️ システム設定</div>
+        
+        <div style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255, 170, 68, 0.15); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+            <div style="font-size: 14px; font-weight: bold; color: #ffaa44; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                🔑 接続認証セッション管理
+            </div>
+            <p style="font-size: 11px; color: rgba(255,255,255,0.6); margin-bottom: 12px; line-height: 1.5;">
+                保存されているダッシュボードの接続ドメインおよびパスワード情報をブラウザから完全に削除します。テスト環境の切り替えや、ログアウトの際にご使用ください。
+            </p>
+            <button class="yt-btn" style="width: 100%; padding: 12px; border-color: #ff5555; color: #ff5555; background: rgba(255,85,85,0.05); font-weight: bold; font-size: 13px; border-radius: 6px; cursor: pointer; transition: all 0.2s;" onclick="resetLoginCredentials()">
+                🚨 接続認証情報をリセット（ログアウト）
+            </button>
+        </div>
+
+        <div style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255, 170, 68, 0.15); border-radius: 8px; padding: 15px;">
+            <div style="font-size: 14px; font-weight: bold; color: #ffaa44; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+                🛠️ アプレットエディットモード
+            </div>
+            <p style="font-size: 11px; color: rgba(255,255,255,0.6); margin-bottom: 12px; line-height: 1.5;">
+                アプレット構築のための編集画面（Edit Mode）へ移行します。今後、アプレット化完了時にこのボタンから直感的にカスタム編集が可能になります。
+            </p>
+            <button class="yt-btn" style="width: 100%; padding: 12px; border-color: rgba(255,170,68,0.3); color: rgba(255,170,68,0.5); background: rgba(255,170,68,0.02); font-weight: bold; font-size: 13px; border-radius: 6px; cursor: not-allowed;" disabled>
+                🔒 エディットモードを起動（アプレット準備中）
+            </button>
+        </div>
+    </div>
+
     <script>
     // ngrok の無料アカウント警告ページを自動バイパスするグローバル fetch パッチ
     const originalFetch = window.fetch;
@@ -425,27 +454,41 @@
     function getStoredPassword() {
         return localStorage.getItem("ngrok_password") || "";
     }
-    
-    // APIサーバーのベースURLを動的解決
-    function getApiBaseUrl() {
-        if (
+
+    function isLocalOrigin() {
+        return (
             CURRENT_ORIGIN.includes("192.168.10.") || 
             CURRENT_ORIGIN.includes("localhost") || 
-            CURRENT_ORIGIN.includes("127.0.0.1") ||
-            CURRENT_ORIGIN.includes("ngrok-free.dev")
-        ) {
+            CURRENT_ORIGIN.includes("127.0.0.1")
+        );
+    }
+
+    function getApiBaseUrl() {
+        // ローカルの開発環境・LAN内の場合は、自動でローカルオリジンを接続先として使用
+        if (isLocalOrigin()) {
             return CURRENT_ORIGIN;
         }
+        
+        // 外部（ngrok等）からアクセスされた場合、
+        // 必ずLocalStorageに保存された「ドメインとパスワード」のセットを必須とします。
         const domain = getStoredDomain();
-        return domain ? `https://${domain}` : "";
+        const password = getStoredPassword();
+        if (!domain || !password) {
+            return ""; // ドメインやパスワードが未入力の場合は、どこにも接続させません
+        }
+        return `https://${domain}`;
     }
 
     // 各種APIエンドポイントの動的解決ゲッター
-    const PC_DATA_URL = `${getApiBaseUrl()}/api/data`; // 既存のポーリングフォールバック用にグローバルに宣言
-    function getPcTokenUrl() { return `${getApiBaseUrl()}/api/youtube-token`; }
-    function getPcStatsUrl() { return `${getApiBaseUrl()}/api/youtube-stats`; }
-    function getPcMicUrl() { return `${getApiBaseUrl()}/api/toggle-mic`; }
-    function getPcSceneUrl() { return `${getApiBaseUrl()}/api/obs-scene`; }
+    function getPcDataUrl() {
+        const base = getApiBaseUrl();
+        return base ? `${base}/api/data` : "";
+    }
+    const PC_DATA_URL = getPcDataUrl(); // 既存のポーリングフォールバック用
+    function getPcTokenUrl() { const base = getApiBaseUrl(); return base ? `${base}/api/youtube-token` : ""; }
+    function getPcStatsUrl() { const base = getApiBaseUrl(); return base ? `${base}/api/youtube-stats` : ""; }
+    function getPcMicUrl() { const base = getApiBaseUrl(); return base ? `${base}/api/toggle-mic` : ""; }
+    function getPcSceneUrl() { const base = getApiBaseUrl(); return base ? `${base}/api/obs-scene` : ""; }
 
     // Basic Auth認証ヘッダーの生成
     function getAuthHeader() {
@@ -457,6 +500,9 @@
 
     // 認証ヘッダーを自動付随するセキュアfetchラッパー
     async function secureFetch(url, options = {}) {
+        if (!url) {
+            return Promise.reject(new Error("No API base URL. Please login."));
+        }
         options.headers = options.headers || {};
         
         const auth = getAuthHeader();
@@ -483,7 +529,24 @@
             }
         }
         
-        return originalFetch(url, options);
+        try {
+            const response = await originalFetch(url, options);
+            if (response.status === 401) {
+                console.warn("🔒 [Unauthorized] Secure fetch returned 401. Showing login UI.");
+                // 認証情報に不整合があるため、パスワードのみ安全にクリア
+                localStorage.removeItem("ngrok_password");
+                showLoginModal();
+                const errDiv = document.getElementById('login-error');
+                if (errDiv) {
+                    errDiv.innerText = "⚠️ ユーザーIDまたはパスワードが正しくありません。";
+                    errDiv.style.display = 'block';
+                }
+            }
+            return response;
+        } catch (err) {
+            console.error("Fetch network error:", err);
+            throw err;
+        }
     }
 
     // 🔌 WebSocket 接続管理
@@ -504,8 +567,8 @@
             wsHost = window.location.host;
         }
 
-        if (!wsHost) {
-            console.log("⚠️ No domain config found, showing login modal.");
+        if (!isLocalOrigin() && (!domain || !password)) {
+            console.log("⚠️ No valid remote credentials found, showing login modal.");
             showLoginModal();
             return;
         }
@@ -616,6 +679,18 @@
         updateDashboard();
     }
 
+    function resetLoginCredentials() {
+        if (confirm("接続認証情報（システムユーザーIDおよびパスワード）を完全にリセットし、ログアウトしますか？")) {
+            localStorage.removeItem("ngrok_domain");
+            localStorage.removeItem("ngrok_password");
+            alert("認証情報をリセットしました。ログイン画面に戻ります。");
+            if (ws && ws.readyState !== WebSocket.CLOSED) {
+                try { ws.close(); } catch(e) {}
+            }
+            location.reload();
+        }
+    }
+
     let currentPC = 'main'; let cachedData = null; let toggleTimeout = null; let activeTab = 'status';
     let wakeLock = null;
 
@@ -681,14 +756,15 @@
         "status": "📊 配信監視",
         "control": "🎙️ ライブ操作",
         "stats": "📈 チャンネル",
-        "macro": "🎛️ マクロ"
+        "macro": "🎛️ マクロ",
+        "settings": "⚙️ 設定"
     };
 
     function renderTabs(tabs) {
         const container = document.getElementById('dashboard-nav-container');
         if (!container) return;
         
-        const currentTabs = tabs || ["status", "control", "stats", "macro"];
+        const currentTabs = tabs || ["status", "control", "stats", "macro", "settings"];
         container.innerHTML = "";
         
         currentTabs.forEach(tabId => {
@@ -785,18 +861,24 @@
         
         // 横方向へのしっかりしたスワイプ、かつ縦スクロール誤検知を防ぐ縦方向の許容値を定義
         if (Math.abs(diffX) > 85 && Math.abs(diffY) < 60) {
-            const tabs = cachedData && cachedData.tabs ? cachedData.tabs : ["status", "control", "stats", "macro"];
-            const currentIndex = tabs.indexOf(activeTab);
+            // ★ 設定タブ（settings）が表示されているときはスワイプ遷移を無効化する
+            if (activeTab === 'settings') {
+                return;
+            }
+            
+            // スワイプによる画面遷移の対象とするメインタブ群（settingsは除外）
+            const swipeableTabs = ["status", "control", "stats", "macro"];
+            const currentIndex = swipeableTabs.indexOf(activeTab);
             
             if (currentIndex !== -1) {
                 if (diffX < 0) {
                     // 左スワイプ -> 右のタブへ
-                    const nextIndex = (currentIndex + 1) % tabs.length;
-                    switchTab(tabs[nextIndex]);
+                    const nextIndex = (currentIndex + 1) % swipeableTabs.length;
+                    switchTab(swipeableTabs[nextIndex]);
                 } else {
                     // 右スワイプ -> 左のタブへ
-                    const nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
-                    switchTab(tabs[nextIndex]);
+                    const nextIndex = (currentIndex - 1 + swipeableTabs.length) % swipeableTabs.length;
+                    switchTab(swipeableTabs[nextIndex]);
                 }
             }
         }
