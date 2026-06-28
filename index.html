@@ -246,6 +246,47 @@
             background: #cc3333;
         }
 
+        /* 📱 トグルスイッチ用のCSSスタイル */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(255, 255, 255, 0.15);
+            transition: .3s;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #777;
+            transition: .3s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: rgba(255, 170, 68, 0.2);
+            border-color: #ffaa44;
+        }
+        input:checked + .slider:before {
+            transform: translateX(20px);
+            background-color: #ffaa44;
+        }
+
     </style>
 </head>
 <body>
@@ -424,6 +465,23 @@
                 <span style="font-size: 12px; color: rgba(255,255,255,0.7);">現在の通信方式:</span>
                 <span id="comm-mode-badge" class="net-status-badge" style="background: #ffaa44; color: #0d0d11; font-weight: bold; padding: 2px 8px; border-radius: 4px; font-size: 11px;">判定中...</span>
             </div>
+
+            <!-- 📱 iOS互換モードスイッチ -->
+            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255, 170, 68, 0.05); border: 1px dashed rgba(255, 170, 68, 0.25); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px;">
+                <div style="text-align: left; padding-right: 10px;">
+                    <div style="font-size: 12px; font-weight: bold; color: #ffaa44; display: flex; align-items: center; gap: 4px;">
+                        📱 iOS / Safari 互換モード
+                    </div>
+                    <div style="font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 2px; line-height: 1.3;">
+                        iPhoneやSafari等で、WebSocket接続時の「ngrok/基本認証ポップアップ」が無限にループするのを防ぐために、通信を安定した高速HTTPポーリング（2秒間隔）へ固定します。
+                    </div>
+                </div>
+                <label class="switch" style="position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0;">
+                    <input type="checkbox" id="ios-compat-toggle" onchange="toggleIosCompatibility(this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
             <p style="font-size: 11px; color: rgba(255,255,255,0.6); line-height: 1.5; margin: 0;">
                 WebSocket(WSS)接続が可能な場合は、超低遅延で常時接続双方向通信を行います。セキュリティ制限やブラウザ環境（Safari/Edge等）でWebSocketが遮断された場合は、自動的に超高速HTTPポーリング通信へ切り替わり、ダッシュボード操作を維持します。
             </p>
@@ -669,14 +727,13 @@
         try {
             const response = await originalFetch(url, options);
             if (response.status === 401) {
-                console.warn("🔒 [Unauthorized] Secure fetch returned 401. Showing login UI.");
-                // 認証情報に不整合があるため、パスワードのみ安全にクリア
-                localStorage.removeItem("ngrok_password");
-                showLoginModal();
-                const errDiv = document.getElementById('login-error');
-                if (errDiv) {
-                    errDiv.innerText = "⚠️ ユーザーIDまたはパスワードが正しくありません。";
-                    errDiv.style.display = 'block';
+                console.warn("🔒 [Unauthorized] Secure fetch returned 401. Password may be wrong.");
+                isAuthError = true;
+                updateConnectionStatusUI();
+            } else if (response.status === 200) {
+                if (isAuthError) {
+                    isAuthError = false;
+                    updateConnectionStatusUI();
                 }
             }
             return response;
@@ -684,6 +741,42 @@
             console.error("Fetch network error:", err);
             throw err;
         }
+    }
+
+    // 💡 デバイス & 通信最適化用の変数とヘルパー
+    let isAuthError = false; // 認証（401）エラーフラグ
+
+    function isIOS() {
+        return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    }
+
+    // iOS互換モードの取得・設定（デフォルトはiOSならtrue、それ以外は保存値またはfalse）
+    function getIosCompatibilityMode() {
+        const stored = localStorage.getItem("ios_compatibility_mode");
+        if (stored === null) {
+            return isIOS(); // 初回はiOSなら自動的にON
+        }
+        return stored === "true";
+    }
+
+    function setIosCompatibilityMode(value) {
+        localStorage.setItem("ios_compatibility_mode", value ? "true" : "false");
+    }
+
+    function toggleIosCompatibility(enabled) {
+        setIosCompatibilityMode(enabled);
+        console.log(`📱 iOS Compatibility Mode changed: ${enabled}`);
+        if (enabled) {
+            if (ws) {
+                try { ws.close(); } catch(e) {}
+                ws = null;
+            }
+            startDashboardPolling();
+        } else {
+            wsConsecutiveFailures = 0;
+            connectWebSocket();
+        }
+        updateConnectionStatusUI();
     }
 
     // 🔌 WebSocket 接続管理
@@ -699,7 +792,11 @@
         
         // 設定タブ内の通信方式バッジの更新
         if (commBadge) {
-            if (isWsOpen) {
+            if (isAuthError) {
+                commBadge.innerText = "🔒 認証エラー (PW不一致)";
+                commBadge.style.background = "#ff4444"; // 赤
+                commBadge.style.color = "#ffffff";
+            } else if (isWsOpen) {
                 commBadge.innerText = "🔌 WebSocket (常時接続)";
                 commBadge.style.background = "#00ffff"; // シアン
                 commBadge.style.color = "#0d0d11";
@@ -709,7 +806,7 @@
                 commBadge.style.color = "#0d0d11";
             } else {
                 commBadge.innerText = "🔴 OFFLINE (接続切断中)";
-                commBadge.style.background = "#ff4444"; // 赤
+                commBadge.style.background = "#777777"; // 灰色
                 commBadge.style.color = "#ffffff";
             }
         }
@@ -731,11 +828,28 @@
             if (!isLocalOrigin()) {
                 const ngrokBanner = document.getElementById('ngrok-warning');
                 if (ngrokBanner) ngrokBanner.style.display = 'block';
+                const ngrokBtnLink = document.getElementById('ngrok-btn-link');
+                const storedDomain = getStoredDomain();
+                if (ngrokBtnLink && storedDomain) {
+                    ngrokBtnLink.href = `https://${storedDomain}`;
+                }
             }
         }
     }
 
     function connectWebSocket() {
+        // iOS互換モード（WebSocket無効化）が有効な場合、WS接続は最初からスキップし、HTTPポーリングを作動させます
+        if (getIosCompatibilityMode()) {
+            console.log("📱 iOS/Safari Compatibility Mode active. Skipping WebSocket and using high-speed HTTP polling.");
+            if (ws) {
+                try { ws.close(); } catch(e) {}
+                ws = null;
+            }
+            startDashboardPolling(); // 高速HTTPポーリングを走らせる
+            updateConnectionStatusUI();
+            return;
+        }
+
         const domain = getStoredDomain();
         const password = getStoredPassword();
         
@@ -2036,6 +2150,13 @@
     // 🔌 WebSocket接続および動的ロードのキック
     const initDomain = getStoredDomain();
     const initPassword = getStoredPassword();
+
+    // 📱 iOS互換モードトグルの初期チェック状態の同期
+    const compatToggle = document.getElementById('ios-compat-toggle');
+    if (compatToggle) {
+        compatToggle.checked = getIosCompatibilityMode();
+    }
+
     if (!initDomain || !initPassword) {
         showLoginModal();
     } else {
