@@ -1110,7 +1110,14 @@
     let dashboardInterval = null;
 
     function startDashboardPolling() {
+        // iOS互換モードがOFF、かつWebSocket接続中/正常稼働中（wsConsecutiveFailures < 6 で、かつ ws か wsReconnectTimeout が存在）の場合はHTTPポーリングをブロック
+        if (!getIosCompatibilityMode() && wsConsecutiveFailures < 6 && (ws || wsReconnectTimeout)) {
+            console.log("ℹ️ WebSocket is active or attempting connection. HTTP polling blocked.");
+            stopDashboardPolling();
+            return;
+        }
         if (!dashboardInterval) {
+            console.log("📡 HTTP Polling (高速定期フェッチ) を起動しました。");
             dashboardInterval = setInterval(updateDashboard, 2500); // 2.5秒に1回のデータ取得（通信負荷を大幅に最適化）
         }
     }
@@ -1126,6 +1133,9 @@
         if (document.visibilityState === 'visible') {
             console.log("📱 [Visibility] 画面アクティブ復帰を検知。自動高速再接続シーケンスを開始...");
             requestWakeLock();
+            
+            // ゾンビ接続のクリーンアップと失敗カウンタのリセット
+            wsConsecutiveFailures = 0;
             
             // ゾンビ状態（不通なのにブラウザがCloseを感知していない状態）の古いWebSocketを確実に強制切断
             if (ws) {
@@ -1149,8 +1159,7 @@
             setTimeout(() => {
                 console.log("⚡ [Visibility] WebSocketの超速強制再接続を実行します。");
                 connectWebSocket();
-                updateDashboard(); // 画面に復帰した瞬間に最速でデータ取得
-                startDashboardPolling();
+                updateDashboard(); // 画面に復帰した瞬間に最速でデータ取得（一度だけ）
             }, 100);
         } else {
             console.log("📱 [Visibility] バックグラウンド（非表示・スリープ）移行。通信を休止します。");
