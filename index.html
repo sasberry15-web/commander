@@ -834,7 +834,7 @@
         }
     }
 
-    function connectWebSocket() {
+    async function connectWebSocket() {
         // iOS互換モード（WebSocket無効化）が有効な場合、WS接続は最初からスキップし、HTTPポーリングを作動させます
         if (getIosCompatibilityMode()) {
             console.log("📱 iOS/Safari Compatibility Mode active. Skipping WebSocket and using high-speed HTTP polling.");
@@ -864,6 +864,33 @@
 
         if (ws) {
             try { ws.close(); } catch(e) {}
+        }
+
+        // 🔐 【2段階開通プロセス】WebSocket接続の前に HTTP Fetch で「通行手形(Cookie)」を取得します。
+        // これにより、ngrokの初回開通警告（Visit Site）をスマートに回避できます。
+        if (!isLocalOrigin()) {
+            try {
+                const httpProto = window.location.protocol;
+                const loginUrl = `${httpProto}//${wsHost}/api/login`;
+                console.log("🔒 [2段階開通] HTTPログインによるngrok警告バイパスCookieの取得を開始...");
+                
+                const response = await fetch(loginUrl, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "ngrok-skip-browser-warning": "true"
+                    },
+                    body: JSON.stringify({ password: password })
+                });
+                
+                if (!response.ok) {
+                    console.warn(`⚠️ HTTPログインに失敗しました (Status: ${response.status})。WebSocketを直接試行します。`);
+                } else {
+                    console.log("🟢 [2段階開通] HTTPログインに成功！バイパスCookieがブラウザに刻まれました。");
+                }
+            } catch (err) {
+                console.warn("⚠️ HTTPログイン中にネットワークエラーが発生しました。WebSocketを直接試行します:", err);
+            }
         }
 
         const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -1072,10 +1099,36 @@
 
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
+            console.log("📱 [Visibility] 画面アクティブ復帰を検知。自動高速再接続シーケンスを開始...");
             requestWakeLock();
-            updateDashboard(); // 画面に復帰した瞬間に最速でデータ取得
-            startDashboardPolling();
+            
+            // ゾンビ状態（不通なのにブラウザがCloseを感知していない状態）の古いWebSocketを確実に強制切断
+            if (ws) {
+                try {
+                    console.log("🧹 ゾンビWebSocketを切断・クリーンアップ中...");
+                    ws.onopen = null;
+                    ws.onmessage = null;
+                    ws.onerror = null;
+                    ws.onclose = null;
+                    ws.close();
+                } catch (e) {}
+                ws = null;
+            }
+            
+            if (wsReconnectTimeout) {
+                clearTimeout(wsReconnectTimeout);
+                wsReconnectTimeout = null;
+            }
+            
+            // 0.1秒（100ms）後にWebSocketを強制超速再接続！
+            setTimeout(() => {
+                console.log("⚡ [Visibility] WebSocketの超速強制再接続を実行します。");
+                connectWebSocket();
+                updateDashboard(); // 画面に復帰した瞬間に最速でデータ取得
+                startDashboardPolling();
+            }, 100);
         } else {
+            console.log("📱 [Visibility] バックグラウンド（非表示・スリープ）移行。通信を休止します。");
             stopDashboardPolling(); // 非表示（スリープ、他アプリ使用時）は通信を完全にシャットアウト
         }
     });
