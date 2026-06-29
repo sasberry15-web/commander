@@ -457,6 +457,24 @@
                 <span id="comm-mode-badge" class="net-status-badge" style="background: #ffaa44; color: #0d0d11; font-weight: bold; padding: 2px 8px; border-radius: 4px; font-size: 11px;">判定中...</span>
             </div>
 
+            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px;">
+                <span style="font-size: 12px; color: rgba(255,255,255,0.7);">接続元自動判別:</span>
+                <span id="connection-origin-badge" class="net-status-badge" style="background: #a855f7; color: #ffffff; font-weight: bold; padding: 2px 8px; border-radius: 4px; font-size: 11px;">判定中...</span>
+            </div>
+
+            <!-- 🔗 LAN内直接接続用クイックリンクボタン -->
+            <div id="lan-direct-connection-box" style="display: none; background: rgba(85, 255, 85, 0.05); border: 1px dashed rgba(85, 255, 85, 0.25); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; text-align: left;">
+                <div style="font-size: 12px; font-weight: bold; color: #55ff55; display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+                    🟢 同一LAN内直接接続の案内
+                </div>
+                <div style="font-size: 10px; color: rgba(255,255,255,0.6); line-height: 1.4; margin-bottom: 8px;">
+                    お使いのスマホが自宅PCと同じWi-Fi（LAN）に接続されている場合、ngrok（トンネル制限）を一切消費しない超高速・無制限の「LAN内直接接続」をご利用いただけます。
+                </div>
+                <button class="yt-btn" id="lan-direct-connect-btn" style="width: 100%; padding: 8px; border-color: #55ff55; color: #55ff55; background: rgba(85,255,85,0.05); font-weight: bold; font-size: 11px; border-radius: 4px; cursor: pointer; transition: all 0.2s;" onclick="goToLanDirectAddress()">
+                    🔗 直接接続する: http://[メインPCのIP]:8000/
+                </button>
+            </div>
+
             <!-- 📱 iOS互換モードスイッチ -->
             <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(255, 170, 68, 0.05); border: 1px dashed rgba(255, 170, 68, 0.25); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px;">
                 <div style="text-align: left; padding-right: 10px;">
@@ -764,10 +782,7 @@
         setIosCompatibilityMode(enabled);
         console.log(`📱 iOS Compatibility Mode changed: ${enabled}`);
         if (enabled) {
-            if (ws) {
-                try { ws.close(); } catch(e) {}
-                ws = null;
-            }
+            disconnectWebSocket();
             startDashboardPolling();
         } else {
             wsConsecutiveFailures = 0;
@@ -780,12 +795,52 @@
     let ws = null;
     let wsReconnectTimeout = null;
     let wsHeartbeatInterval = null;
+    let isConnecting = false; // 💡 重複接続を絶対に防止する「ロックフラグ」
+    let lastPongTime = 0;     // 💡 ハートビートの双方向化（最後のPong受信時刻）
+
+    // 💡 安全に古いタイマーや接続をすべて一旦キレイにする「片付け関数」
+    function disconnectWebSocket() {
+        console.log("🔌 [WebSocket] Clearing old connection and timers...");
+        if (ws) {
+            try {
+                ws.onclose = null;
+                ws.onerror = null;
+                ws.onmessage = null;
+                ws.onopen = null;
+                ws.close();
+            } catch (e) {
+                console.error("Error closing socket:", e);
+            }
+            ws = null;
+        }
+        if (wsHeartbeatInterval) {
+            clearInterval(wsHeartbeatInterval);
+            wsHeartbeatInterval = null;
+        }
+        if (wsReconnectTimeout) {
+            clearTimeout(wsReconnectTimeout);
+            wsReconnectTimeout = null;
+        }
+        isConnecting = false;
+    }
+
+    function isWsOpen() {
+        return ws && ws.readyState === WebSocket.OPEN;
+    }
+
+    function goToLanDirectAddress() {
+        const ip = (cachedData && cachedData.main_pc_ip) || "192.168.10.103";
+        window.location.href = `http://${ip}:8000/`;
+    }
 
     function updateConnectionStatusUI() {
         const micAlert = document.getElementById('mic-alert');
         const commBadge = document.getElementById('comm-mode-badge');
+        const originBadge = document.getElementById('connection-origin-badge');
+        const directBox = document.getElementById('lan-direct-connection-box');
+        const directBtn = document.getElementById('lan-direct-connect-btn');
         
-        const isWsOpen = ws && ws.readyState === WebSocket.OPEN;
+        const isWs = isWsOpen();
         const isHttpHealthy = (Date.now() - lastSuccessfulFetchTime < 6000); // 直近6秒以内にフェッチが成功しているか
         
         // 設定タブ内の通信方式バッジの更新
@@ -794,7 +849,7 @@
                 commBadge.innerText = "🔒 認証エラー (PW不一致)";
                 commBadge.style.background = "#ff4444"; // 赤
                 commBadge.style.color = "#ffffff";
-            } else if (isWsOpen) {
+            } else if (isWs) {
                 commBadge.innerText = "🔌 WebSocket (常時接続)";
                 commBadge.style.background = "#00ffff"; // シアン
                 commBadge.style.color = "#0d0d11";
@@ -808,10 +863,37 @@
                 commBadge.style.color = "#ffffff";
             }
         }
+
+        // 🟢 接続元自動判別バッジの更新
+        if (originBadge) {
+            if (isLocalOrigin()) {
+                originBadge.innerText = "🟢 ローカルLAN直接接続（高速・無制限）";
+                originBadge.style.background = "#22c55e"; // 緑
+                originBadge.style.color = "#ffffff";
+            } else {
+                originBadge.innerText = "🛰️ リモート中継接続（ngrok経由）";
+                originBadge.style.background = "#eab308"; // 黄色
+                originBadge.style.color = "#000000";
+            }
+        }
+
+        // 🔗 直接接続用案内ボックスとボタンの動的更新
+        if (directBox && directBtn) {
+            if (cachedData && cachedData.main_pc_ip) {
+                if (!isLocalOrigin()) {
+                    directBox.style.display = "block";
+                    directBtn.innerText = `🔗 直接接続する: http://${cachedData.main_pc_ip}:8000/`;
+                } else {
+                    directBox.style.display = "none";
+                }
+            } else {
+                directBox.style.display = "none";
+            }
+        }
         
         if (!micAlert) return;
         
-        if (isWsOpen || isHttpHealthy) {
+        if (isWs || isHttpHealthy) {
             const ngrokBanner = document.getElementById('ngrok-warning');
             if (ngrokBanner) ngrokBanner.style.display = 'none';
             
@@ -836,23 +918,22 @@
     }
 
     async function connectWebSocket() {
-        // すでに接続中（CONNECTING または OPEN）の場合は、重ねて接続が走るのを完全に防止します
-        if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) {
-            console.log("🔌 WebSocket is already open or connecting. Skipping duplicate connection attempt.");
+        // 💡 重複接続を絶対に防止する「ロックフラグ」チェック
+        if (isConnecting) {
+            console.log("🔌 [WebSocket] Connection is already in progress. Skipping duplicate attempt.");
             return;
         }
+        if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) {
+            console.log("🔌 [WebSocket] WebSocket is already open or connecting. Skipping duplicate attempt.");
+            return;
+        }
+
+        isConnecting = true;
 
         // iOS互換モード（WebSocket無効化）が有効な場合、WS接続は最初からスキップし、HTTPポーリングを作動させます
         if (getIosCompatibilityMode()) {
             console.log("📱 iOS/Safari Compatibility Mode active. Skipping WebSocket and using high-speed HTTP polling.");
-            if (ws) {
-                try {
-                    ws.onclose = null;
-                    ws.onerror = null;
-                    ws.close();
-                } catch(e) {}
-                ws = null;
-            }
+            disconnectWebSocket();
             startDashboardPolling(); // 高速HTTPポーリングを走らせる
             updateConnectionStatusUI();
             return;
@@ -869,24 +950,14 @@
 
         if (!isLocalOrigin() && (!domain || !password)) {
             console.log("⚠️ No valid remote credentials found, showing login modal.");
+            isConnecting = false;
             showLoginModal();
             return;
         }
 
-        if (ws) {
-            try {
-                // 💡 既存のソケットを閉じる際、その onclose が作動して無駄な再接続タイマーが
-                // 重複して登録されるのを防ぐため、あらかじめハンドラを解除して安全にクローズします。
-                ws.onclose = null;
-                ws.onerror = null;
-                ws.close();
-            } catch(e) {}
-            ws = null;
-        }
-        if (wsHeartbeatInterval) {
-            clearInterval(wsHeartbeatInterval);
-            wsHeartbeatInterval = null;
-        }
+        // 💡 既存のソケットやタイマーを安全にすべて一度クリーンにする
+        disconnectWebSocket();
+        isConnecting = true; // クリーンアップで解除されるので再度セット
 
         // 🔐 【2段階開通プロセス】WebSocket接続の前に HTTP Fetch で「通行手形(Cookie)」を取得します。
         // これにより、ngrokの初回開通警告（Visit Site）をスマートに回避できます。
@@ -927,11 +998,20 @@
         ws.onopen = () => {
             console.log("🟢 WebSocket Connected!");
             wsConsecutiveFailures = 0; // 接続成功でリセット
+            isConnecting = false;      // 接続完了したためフラグ解除
+            lastPongTime = Date.now(); // 接続開始した瞬間を最終Pong受信時刻の初期値にする
             
             // 💓 5秒おきのハートビート(Ping)を設定して、iOS/Safariのスリープやゾンビ接続化を防止
             if (wsHeartbeatInterval) clearInterval(wsHeartbeatInterval);
             wsHeartbeatInterval = setInterval(() => {
                 if (ws && ws.readyState === WebSocket.OPEN) {
+                    // 💡 ハートビートの双方向化（アクティブ・ハートビート監視）：15秒間一度も返事（Pong）が来なかったらスマホ側から「ゾンビ接続だ！」と自主的に断定し再接続
+                    if (Date.now() - lastPongTime > 15000) {
+                        console.warn("⚠️ [Heartbeat] 15 seconds without Pong. Zombie connection detected! Restarting WebSocket immediately.");
+                        disconnectWebSocket();
+                        connectWebSocket();
+                        return;
+                    }
                     ws.send(JSON.stringify({ type: "ping" }));
                 }
             }, 5000);
@@ -944,8 +1024,23 @@
             try {
                 const data = JSON.parse(event.data);
                 
-                // 💓 ポン応答は処理をスルー
+                // 💓 ポン応答は処理をスルーしつつ、最終Pong受信時刻を完璧に記録
                 if (data && data.type === "pong") {
+                    lastPongTime = Date.now();
+                    return;
+                }
+
+                // 💡 WebSocket経由の各種レスポンスをCustomEventでディスパッチして非同期解決する
+                if (data && data.type === "chat-response") {
+                    window.dispatchEvent(new CustomEvent("ws-chat-response", { detail: data }));
+                    return;
+                }
+                if (data && data.type === "youtube-token-response") {
+                    window.dispatchEvent(new CustomEvent("ws-youtube-token-response", { detail: data }));
+                    return;
+                }
+                if (data && data.type === "youtube-stats-response") {
+                    window.dispatchEvent(new CustomEvent("ws-youtube-stats-response", { detail: data }));
                     return;
                 }
                 
@@ -971,6 +1066,7 @@
         };
 
         ws.onclose = (event) => {
+            isConnecting = false;
             wsConsecutiveFailures++;
             console.log(`🔴 WebSocket Closed (Failure Count: ${wsConsecutiveFailures}). Info:`, event.reason);
             
@@ -996,6 +1092,7 @@
         };
 
         ws.onerror = (error) => {
+            isConnecting = false;
             console.error("⚠️ WebSocket Error: ", error);
             // エラー時もステータス更新を呼び出す
             updateConnectionStatusUI();
@@ -1340,6 +1437,30 @@
     }
 
     async function fetchLatestToken() {
+        if (isWsOpen()) {
+            return new Promise((resolve) => {
+                const timeoutId = setTimeout(() => {
+                    window.removeEventListener("ws-youtube-token-response", onWsResponse);
+                    resolve(null);
+                }, 4000);
+
+                const onWsResponse = (e) => {
+                    clearTimeout(timeoutId);
+                    window.removeEventListener("ws-youtube-token-response", onWsResponse);
+                    if (e.detail.success && e.detail.data) {
+                        const tData = e.detail.data;
+                        const token = (tData && typeof tData === 'object') ? (tData.token || tData.raw_token || tData.access_token) : tData;
+                        resolve(token || null);
+                    } else {
+                        resolve(null);
+                    }
+                };
+
+                window.addEventListener("ws-youtube-token-response", onWsResponse);
+                ws.send(JSON.stringify({ action: "youtube-token" }));
+            });
+        }
+
         try {
             const res = await secureFetch(getPcTokenUrl());
             const tData = await res.json();
@@ -1460,11 +1581,15 @@
             cachedData.current_scene = sceneName;
             renderObsScenes(cachedData.obs_scenes, sceneName);
         }
-        secureFetch(getPcSceneUrl(), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sceneName: sceneName })
-        }).catch(() => {});
+        if (isWsOpen()) {
+            ws.send(JSON.stringify({ action: "obs-scene", sceneName: sceneName }));
+        } else {
+            secureFetch(getPcSceneUrl(), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sceneName: sceneName })
+            }).catch(() => {});
+        }
     }
 
     function formatToJST(isoString) {
@@ -1714,34 +1839,63 @@
         if(!msg || !chatId || chatId === "null" || chatId === "") { alert("エラー: 有効なチャットIDが見つかりません。"); return; }
         const orig = btn.innerText; btn.innerText = ".."; btn.disabled = true;
         
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const handleResponse = (d) => {
+            if(d.success) {
+                txtInput.value = ''; alert("🚀 【PC代過ルート】チャット投稿に成功しました！");
+                btn.innerText = orig; btn.disabled = false;
+            } else {
+                throw new Error(d.error || "PC側のAPIエラー");
+            }
+        };
 
-        secureFetch(`${getApiBaseUrl()}/api/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: chatId, message: msg }),
-            signal: controller.signal
-        })
-        .then(res => {
-            clearTimeout(timeoutId);
-            if (res.ok) {
-                return res.json().then(d => {
-                    if(d.success) {
-                        txtInput.value = ''; alert("🚀 【PC代過ルート】チャット投稿に成功しました！");
-                        btn.innerText = orig; btn.disabled = false;
-                    } else { throw new Error(d.error || "PC側のAPIエラー"); }
-                });
-            } else { throw new Error("PCオフライン"); }
-        })
-        .catch(err => {
-            clearTimeout(timeoutId); btn.innerText = orig; btn.disabled = false;
+        const handleChatError = (err) => {
+            btn.innerText = orig; btn.disabled = false;
             console.log("PCルート断念。公式アプリリンクを展開します:", err.message);
             if (confirm("⚠️ 【PC応答なし / タイムアウト】\nPC経由での投稿がタイムアウトしたか、PCがオフラインです。スマホの【YouTube公式アプリ】で配信ページを開き、直接チャットを投稿しますか？")) {
                 window.open(`https://www.youtube.com/watch?v=${broadcastId}`, '_blank');
                 txtInput.value = ''; 
             }
-        });
+        };
+
+        if (isWsOpen()) {
+            const timeoutId = setTimeout(() => {
+                window.removeEventListener("ws-chat-response", onWsResponse);
+                handleChatError(new Error("WebSocket応答タイムアウト"));
+            }, 6000);
+
+            const onWsResponse = (e) => {
+                clearTimeout(timeoutId);
+                window.removeEventListener("ws-chat-response", onWsResponse);
+                try {
+                    handleResponse(e.detail);
+                } catch(err) {
+                    handleChatError(err);
+                }
+            };
+
+            window.addEventListener("ws-chat-response", onWsResponse);
+            ws.send(JSON.stringify({ action: "chat", chat_id: chatId, message: msg }));
+        } else {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            secureFetch(`${getApiBaseUrl()}/api/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: chatId, message: msg }),
+                signal: controller.signal
+            })
+            .then(res => {
+                clearTimeout(timeoutId);
+                if (res.ok) {
+                    return res.json().then(handleResponse);
+                } else { throw new Error("PCオフライン"); }
+            })
+            .catch(err => {
+                clearTimeout(timeoutId);
+                handleChatError(err);
+            });
+        }
     }
 
     function forceEndBroadcast(broadcastId, btn) {
@@ -1764,9 +1918,7 @@
         const container = document.getElementById('yt-analytics-container');
         const sBadge = document.getElementById('net-badge-stats');
         
-        secureFetch(getPcStatsUrl())
-        .then(res => res.json())
-        .then(d => {
+        const renderData = (d) => {
             const token = (d && typeof d === 'object') ? (d.raw_token || d.token || d.access_token) : d;
             if (token && token !== "mock_wait_access_token" && token !== "") {
                 localStorage.setItem("cached_yt_token", token);
@@ -1794,9 +1946,6 @@
                 </div>`;
             });
 
-            const subDeltaStr = d.an_28d_sub >= 0 ? `+${d.an_28d_sub}` : `${d.an_28d_sub}`;
-            const revenueStr = d.an_28d_rev === -1 ? "￥--" : `￥${parseInt(d.an_28d_rev).toLocaleString()}`;
-
             container.innerHTML = `
                 <div style="font-size:16px; font-weight:bold; color:#fff; text-align:center; margin-bottom:12px; text-shadow:0 0 4px #ffaa44;">👑 ${d.channel_title}</div>
                 ${warningHtml}
@@ -1822,17 +1971,47 @@
                 </div>
                 <div class="section-title"><span>直近アーカイブ</span></div>
                 ${pastHtml || '<div class="user-text">アーカイブデータがありません</div>'}`;
-        })
-        .catch(() => {
+        };
+
+        const handleAnalyticsError = () => {
             if(sBadge) { sBadge.innerText = "OFFLINE (PC停止中)"; sBadge.className = "net-status-badge net-offline"; }
             container.innerHTML = `<div class="comment-card"><div class="user-text" style="text-align:center; color:#ff4444;">PCオフラインのため取得できません。</div></div>`;
-        });
+        };
+
+        if (isWsOpen()) {
+            const timeoutId = setTimeout(() => {
+                window.removeEventListener("ws-youtube-stats-response", onWsResponse);
+                handleAnalyticsError();
+            }, 6000);
+
+            const onWsResponse = (e) => {
+                clearTimeout(timeoutId);
+                window.removeEventListener("ws-youtube-stats-response", onWsResponse);
+                if (e.detail.success && e.detail.data) {
+                    renderData(e.detail.data);
+                } else {
+                    handleAnalyticsError();
+                }
+            };
+
+            window.addEventListener("ws-youtube-stats-response", onWsResponse);
+            ws.send(JSON.stringify({ action: "youtube-stats" }));
+        } else {
+            secureFetch(getPcStatsUrl())
+            .then(res => res.json())
+            .then(renderData)
+            .catch(handleAnalyticsError);
+        }
     }
 
     function toggleMicMute() {
         if (cachedData && cachedData.obs_status_class === 'silent') { return; }
         def_wakeUpPhoneShield();
-        secureFetch(getPcMicUrl(), { method: 'POST' }).then(() => { setTimeout(updateDashboard, 100); });
+        if (isWsOpen()) {
+            ws.send(JSON.stringify({ action: "toggle-mic" }));
+        } else {
+            secureFetch(getPcMicUrl(), { method: 'POST' }).then(() => { setTimeout(updateDashboard, 100); });
+        }
     }
     function triggerToggleLit() {
         const btn = document.getElementById('pc-toggle-btn'); btn.classList.add('lit');
@@ -2147,12 +2326,16 @@
                     btn.style.fontSize = uiTheme.font_size;
                 }
                 
-                // 🚀 マクロ実行APIへ直撃通信
+                // 🚀 マクロ実行APIへ通信（WebSocketを最優先）
                 btn.onclick = () => {
-                    secureFetch(`${getApiBaseUrl()}/api/execute-macro`, {
-                        method: "POST",
-                        body: JSON.stringify({ type: m.type, value: m.value })
-                    }).catch(() => {});
+                    if (isWsOpen()) {
+                        ws.send(JSON.stringify({ action: "execute-macro", type: m.type, value: m.value }));
+                    } else {
+                        secureFetch(`${getApiBaseUrl()}/api/execute-macro`, {
+                            method: "POST",
+                            body: JSON.stringify({ type: m.type, value: m.value })
+                        }).catch(() => {});
+                    }
                 };
                 mContainer.appendChild(btn);
             });
