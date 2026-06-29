@@ -779,6 +779,7 @@
     // 🔌 WebSocket 接続管理
     let ws = null;
     let wsReconnectTimeout = null;
+    let wsHeartbeatInterval = null;
 
     function updateConnectionStatusUI() {
         const micAlert = document.getElementById('mic-alert');
@@ -864,6 +865,11 @@
 
         if (ws) {
             try { ws.close(); } catch(e) {}
+            ws = null;
+        }
+        if (wsHeartbeatInterval) {
+            clearInterval(wsHeartbeatInterval);
+            wsHeartbeatInterval = null;
         }
 
         // 🔐 【2段階開通プロセス】WebSocket接続の前に HTTP Fetch で「通行手形(Cookie)」を取得します。
@@ -906,6 +912,14 @@
             console.log("🟢 WebSocket Connected!");
             wsConsecutiveFailures = 0; // 接続成功でリセット
             
+            // 💓 5秒おきのハートビート(Ping)を設定して、iOS/Safariのスリープやゾンビ接続化を防止
+            if (wsHeartbeatInterval) clearInterval(wsHeartbeatInterval);
+            wsHeartbeatInterval = setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "ping" }));
+                }
+            }, 5000);
+            
             updateConnectionStatusUI();
             stopDashboardPolling(); // WebSocketが健康なのでHTTPポーリングを停止
         };
@@ -913,6 +927,12 @@
         ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
+                
+                // 💓 ポン応答は処理をスルー
+                if (data && data.type === "pong") {
+                    return;
+                }
+                
                 cachedData = data;
                 
                 let activeTabs = data.tabs;
@@ -937,6 +957,11 @@
         ws.onclose = (event) => {
             wsConsecutiveFailures++;
             console.log(`🔴 WebSocket Closed (Failure Count: ${wsConsecutiveFailures}). Info:`, event.reason);
+            
+            if (wsHeartbeatInterval) {
+                clearInterval(wsHeartbeatInterval);
+                wsHeartbeatInterval = null;
+            }
             
             if (wsReconnectTimeout) clearTimeout(wsReconnectTimeout);
             
@@ -1714,7 +1739,7 @@
         const container = document.getElementById('yt-analytics-container');
         const sBadge = document.getElementById('net-badge-stats');
         
-        fetch(PC_STATS_URL)
+        secureFetch(getPcStatsUrl())
         .then(res => res.json())
         .then(d => {
             const token = (d && typeof d === 'object') ? (d.raw_token || d.token || d.access_token) : d;
