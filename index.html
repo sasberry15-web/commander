@@ -836,11 +836,21 @@
     }
 
     async function connectWebSocket() {
+        // すでに接続中（CONNECTING または OPEN）の場合は、重ねて接続が走るのを完全に防止します
+        if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) {
+            console.log("🔌 WebSocket is already open or connecting. Skipping duplicate connection attempt.");
+            return;
+        }
+
         // iOS互換モード（WebSocket無効化）が有効な場合、WS接続は最初からスキップし、HTTPポーリングを作動させます
         if (getIosCompatibilityMode()) {
             console.log("📱 iOS/Safari Compatibility Mode active. Skipping WebSocket and using high-speed HTTP polling.");
             if (ws) {
-                try { ws.close(); } catch(e) {}
+                try {
+                    ws.onclose = null;
+                    ws.onerror = null;
+                    ws.close();
+                } catch(e) {}
                 ws = null;
             }
             startDashboardPolling(); // 高速HTTPポーリングを走らせる
@@ -864,7 +874,13 @@
         }
 
         if (ws) {
-            try { ws.close(); } catch(e) {}
+            try {
+                // 💡 既存のソケットを閉じる際、その onclose が作動して無駄な再接続タイマーが
+                // 重複して登録されるのを防ぐため、あらかじめハンドラを解除して安全にクローズします。
+                ws.onclose = null;
+                ws.onerror = null;
+                ws.close();
+            } catch(e) {}
             ws = null;
         }
         if (wsHeartbeatInterval) {
