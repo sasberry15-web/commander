@@ -254,6 +254,11 @@
             background: #cc3333;
         }
 
+        @keyframes alert-flicker {
+            0% { background-color: rgba(255, 0, 0, 0.2); }
+            100% { background-color: rgba(255, 0, 0, 0.5); }
+        }
+
         /* 📱 トグルスイッチ用のCSSスタイル */
         .switch {
             position: relative;
@@ -293,6 +298,150 @@
         input:checked + .slider:before {
             transform: translateX(20px);
             background-color: #ffaa44;
+        }
+
+        /* 🧩 モジュール型アプレット装飾スタイル */
+        .dashboard-applet {
+            position: relative;
+            background: #000000;
+            border: 1px solid rgba(255, 170, 68, 0.15);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+        }
+        
+        /* ニュルニュルとトランスフォーム中、あるいはドラッグ時の動き */
+        .dashboard-applet.transforming {
+            opacity: 0.3;
+            transform: scale(0.9) translateY(20px);
+        }
+        
+        .dashboard-applet.dragging {
+            opacity: 0.5;
+            border: 1px dashed #ffaa44 !important;
+            box-shadow: 0 0 15px rgba(255,170,68,0.3) !important;
+        }
+        
+        /* アプレット上部に操作・移動用ハンドルを設置 */
+        .applet-header-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px dashed rgba(255,170,68,0.12);
+            user-select: none;
+            cursor: grab;
+        }
+        .applet-header-bar:active {
+            cursor: grabbing;
+        }
+        
+        .applet-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: rgba(255,170,68,0.5);
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .applet-title::before {
+            content: "::";
+            color: #ffaa44;
+            font-family: monospace;
+            font-weight: bold;
+        }
+        
+        .applet-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .applet-btn {
+            background: rgba(255,170,68,0.05);
+            border: 1px solid rgba(255,170,68,0.2);
+            color: rgba(255,170,68,0.7);
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        
+        .applet-btn:active {
+            background: #ffaa44;
+            color: #000;
+        }
+        
+        /* エディットモード時のオーバーレイ */
+        .edit-overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(10, 10, 13, 0.92);
+            border: 2px dashed #ffaa44;
+            border-radius: 8px;
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            gap: 10px;
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+            padding: 10px;
+            text-align: center;
+        }
+        
+        body.edit-mode-active .edit-overlay {
+            display: flex;
+        }
+        
+        .edit-select-tab {
+            background: #000;
+            border: 1px solid #ffaa44;
+            color: #ffaa44;
+            font-size: 13px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-weight: bold;
+            outline: none;
+            width: 100%;
+            max-width: 180px;
+            height: 38px;
+            line-height: 1.5;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        
+        .edit-btn-row {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            max-width: 180px;
+            justify-content: space-between;
+        }
+        
+        .edit-order-btn {
+            flex: 1;
+            background: rgba(255,170,68,0.05);
+            border: 1px solid #ffaa44;
+            color: #ffaa44;
+            padding: 6px;
+            font-weight: bold;
+            font-size: 11px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .edit-order-btn:active {
+            background: #ffaa44;
+            color: #000;
         }
 
     </style>
@@ -341,7 +490,26 @@
         <a id="ngrok-btn-link" href="#" target="_blank" class="ngrok-link-btn">🔑 接続を許可する (Visit Site)</a>
     </div>
 
-    <video id="no-sleep-video" loop playsinline muted autoplay style="position:fixed; top:0; left:0; width:1px; height:1px; opacity:0.01; pointer-events:none; z-index:-1000;">
+    <!-- 🚨 お部屋環境・熱中症警戒アラートオーバーレイ -->
+    <div id="env-heat-alert-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 0, 0, 0.45); backdrop-filter: blur(4px); z-index: 99999; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; pointer-events: none; animation: alert-flicker 1.5s infinite alternate;">
+        <div style="background: #150000; border: 3px solid #ff3333; border-radius: 16px; padding: 25px; width: 100%; max-width: 440px; box-shadow: 0 0 50px rgba(255, 0, 0, 0.7); text-align: center; pointer-events: auto; box-sizing: border-box;">
+            <div style="font-size: 55px; margin-bottom: 10px; animation: bounce 1s infinite alternate;">⚠️</div>
+            <div style="font-size: 20px; font-weight: bold; color: #ff3333; margin-bottom: 8px; letter-spacing: 1px;">🚨 お部屋の温度が異常上昇中 🚨</div>
+            <div style="font-size: 14px; color: #fff; line-height: 1.6; margin-bottom: 15px;">
+                現在の室温が設定された警告制限値（<span id="alert-overlay-threshold">--.-</span>℃）を超えました。<br>
+                熱中症になる恐れがあります！速やかにエアコンをONにしてください。
+            </div>
+            <div style="background: rgba(255, 0, 0, 0.1); border: 1px dashed rgba(255, 51, 51, 0.4); border-radius: 8px; padding: 12px; margin-bottom: 20px;">
+                <div style="font-size: 12px; color: #aaa; margin-bottom: 2px;">現在の室温 / 湿度</div>
+                <div style="font-size: 26px; font-weight: bold; font-family: monospace; color: #fff;">
+                    <span id="alert-overlay-temp" style="color: #ffaa44;">--.-℃</span> <span id="alert-overlay-humidity" style="color: #00ddff; margin-left:15px;">--.-%</span>
+                </div>
+            </div>
+            <button onclick="document.getElementById('env-heat-alert-overlay').style.display='none'" style="width: 100%; background: #ff3333; color: #fff; font-size: 14px; font-weight: bold; padding: 12px; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(255,51,51,0.3);" onmouseover="this.style.background='#ff5555'" onmouseout="this.style.background='#ff3333'">了解 (CLOSE)</button>
+        </div>
+    </div>
+
+    <video id="no-sleep-video" loop playsinline muted autoplay style="position:absolute; top:0; left:0; width:1px; height:1px; opacity:0.001; pointer-events:none; z-index:9999;">
         <source src="data:video/mp4;base64,AAAAIGZ0eXBtcDQyAAAAAG1wNDJpc29tYXZjMQBtcDQyAAAAH21vb3YAAABsbXZoZAAAAABfS8pYX0vKWAAB9AAAAdwAAQAAAAEAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAACAdHJhawAAXHRraGQAAAADX0vKWF9LylgAAAABAAAAAAAB3AAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAABtZWRpYQAAACBtZGhkAAAAAF9LylhfS8pYAAH0AAAAdwBVY2gAAAAAACloZGxyAAAAAAAAAAB2aWRlbwAAAAAAAAAAAAAAAFZpZGVvTWVkaWEAAAAAVW1pbmYAAAAUdm1oZAAAAAAAQAAAQQAAAAgAc3RibAAAAGZzdHNkAAAAAAAAAAEAAABWYXZjMQAAAAAAAAAAAAAAAAAAAAgACABIAAAASAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGP//AAAARWF2Y0MBbYAKbP/hABhnY0AKbEAhsBAgAAMAAgAAAwB9AAfJgAEABW1kYXQAAAAYR2WeAAMwGQYExv//739fS8pYX0vKWAAAABhkaW5mAAAAEGRyZWYAAAAAAAAAAQAAAAxtdXJsAAAAAQAAAEZzdHRzAAAAAAAAAAEAAAABAAABAAAAAABzdHNjAAAAAAAAAAEAAAABAAAAAQAAAAEAAAAAc3RzeiAAAAAAAAAAAAAAAQAAABgAAAAAc3RjbwAAAAAAAAABAAAAMAAAADdidWRhAAAAKm1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAG1kaXIAAAAAAAAAAAAAAAAAAAAAAAAAY2lsc3QAAAA=" type="video/mp4">
     </video>
 
@@ -354,98 +522,206 @@
     </div>
 
     <div id="panel-status" class="tab-panel active-panel">
-        <div class="stats-container">
-            <div class="stat-card">
-                <div class="stat-inline-row"><span class="stat-side-label">CPU</span><span class="stat-value" id="cpu-val">--%</span></div>
-                <div class="stats-bar"><div class="stat-fill" id="cpu-bar" style="width: 0%;"></div></div>
-                <div class="stat-sub-row"><span id="cpu-temp-val">--°C</span><div class="mem-zone"><span class="mem-label">RAM</span><span id="sys-ram-val">--GB</span></div></div>
+        <!-- 🧩 アプレット: PC負荷スタッツ -->
+        <div class="dashboard-applet" id="applet-stats">
+            <div class="applet-header-bar">
+                <span class="applet-title">PC負荷スタッツ</span>
             </div>
-            <div class="toggle-switch-zone"><div class="toggle-button" id="pc-toggle-btn" onclick="togglePC()">MAIN</div></div>
-            <div class="stat-card">
-                <div class="stat-inline-row"><span class="stat-side-label">GPU</span><span class="stat-value" id="gpu-val">--%</span></div>
-                <div class="stats-bar"><div class="stat-fill" id="gpu-bar" style="width: 0%;"></div></div>
-                <div class="stat-sub-row"><span id="cpu-power-val">--W</span><div class="mem-zone"><span class="mem-label">VRAM</span><span id="gpu-vram-val">--GB</span></div></div>
+            <div class="stats-container">
+                <div class="stat-card">
+                    <div class="stat-inline-row"><span class="stat-side-label">CPU</span><span class="stat-value" id="cpu-val">--%</span></div>
+                    <div class="stats-bar"><div class="stat-fill" id="cpu-bar" style="width: 0%;"></div></div>
+                    <div class="stat-sub-row"><span id="cpu-temp-val">--°C</span><div class="mem-zone"><span class="mem-label">RAM</span><span id="sys-ram-val">--GB</span></div></div>
+                </div>
+                <div class="toggle-switch-zone"><div class="toggle-button" id="pc-toggle-btn" onclick="togglePC()">MAIN</div></div>
+                <div class="stat-card">
+                    <div class="stat-inline-row"><span class="stat-side-label">GPU</span><span class="stat-value" id="gpu-val">--%</span></div>
+                    <div class="stats-bar"><div class="stat-fill" id="gpu-bar" style="width: 0%;"></div></div>
+                    <div class="stat-sub-row"><span id="cpu-power-val">--W</span><div class="mem-zone"><span class="mem-label">VRAM</span><span id="gpu-vram-val">--GB</span></div></div>
+                </div>
             </div>
+            <div class="edit-overlay" data-applet-id="stats"></div>
         </div>
-        <div class="mic-alert-box" id="mic-alert" onclick="toggleMicMute()">🎙️ MIC: 接続待機中...</div>
-        <div class="ffmpeg-panel" id="ffmpeg-panel" style="padding: 6px; background: rgba(0,0,0,0.15); border: 1px solid rgba(255,170,68,0.08); border-radius: 8px; margin-top: 10px; display: none;">
-            <!-- 🖥️ MAIN PC FFmpeg Accordion -->
-            <div class="ffmpeg-accordion" style="border: 1px solid rgba(255, 170, 68, 0.15); border-radius: 6px; margin-bottom: 6px; overflow: hidden; background: rgba(0,0,0,0.2);">
-                <div class="ffmpeg-accordion-header" onclick="toggleAccordion('main-ffmpeg-body')" style="padding: 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;">
-                    <span style="font-weight: bold; font-size: 13px; color: #fff; display: flex; align-items: center; gap: 4px;">🖥️ MAIN FFmpeg  <span id="main-ff-status" style="color: #ffaa44;">待機中</span> </span>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <span id="main-ff-total-pct" style="background: rgba(255,136,0,0.1); padding: 1px 6px; border-radius: 4px; color: #ffaa44; font-size: 11px; font-weight: bold; border: 1px solid rgba(255,136,0,0.2);">--%</span>
-                        <span id="main-ff-arrow" style="font-size: 10px; color: rgba(255,170,68,0.5); transition: transform 0.2s;">▼</span>
-                    </div>
-                </div>
-                <div id="main-ffmpeg-body" class="ffmpeg-accordion-body" style="padding: 10px; display: block; border-top: 1px solid rgba(255,170,68,0.1); background: rgba(0,0,0,0.1);">
-                    <div class="ffmpeg-file" style="font-size: 12px; margin-bottom: 6px; color: rgba(255,255,255,0.85); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ファイル: <span id="main-ff-filename">--</span></div>
-                    <div class="stats-bar" style="height: 4px; background: rgba(255, 170, 68, 0.02); margin-bottom: 12px; border-radius: 2px; overflow: hidden;"><div class="stat-fill" id="main-ff-progress-bar" style="width: 0%; height: 100%; background: #ffaa44; box-shadow: 0 0 6px #ffaa44; transition: width 0.4s ease;"></div></div>
-                    <div class="ffmpeg-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-size: 11px; color: rgba(255,255,255,0.65);"><div>進捗: <span id="main-ff-time" style="color: #fff; font-weight: 500;">--:--:--</span></div><div>速度: <span id="main-ff-speed" style="color: #fff; font-weight: 500;">--x</span></div><div>ビットレート: <span id="main-ff-bitrate" style="color: #fff; font-weight: 500;">--</span></div><div>経過: <span id="main-ff-elapsed" style="color: #fff; font-weight: 500;">--:--:--</span></div></div>
-                </div>
-            </div>
 
-            <!-- 📡 SUB PC FFmpeg Accordion -->
-            <div class="ffmpeg-accordion" style="border: 1px solid rgba(255, 170, 68, 0.15); border-radius: 6px; overflow: hidden; background: rgba(0,0,0,0.2);">
-                <div class="ffmpeg-accordion-header" onclick="toggleAccordion('sub-ffmpeg-body')" style="padding: 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;">
-                    <span style="font-weight: bold; font-size: 13px; color: #fff; display: flex; align-items: center; gap: 4px;">📡 SUB FFmpeg  <span id="sub-ff-status" style="color: #ffaa44;">待機中</span> </span>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <span id="sub-ff-total-pct" style="background: rgba(255,136,0,0.1); padding: 1px 6px; border-radius: 4px; color: #ffaa44; font-size: 11px; font-weight: bold; border: 1px solid rgba(255,136,0,0.2);">--%</span>
-                        <span id="sub-ff-arrow" style="font-size: 10px; color: rgba(255,170,68,0.5); transition: transform 0.2s;">▼</span>
-                    </div>
+        <!-- 🧩 アプレット: マイクコントロール -->
+        <div class="dashboard-applet" id="applet-mic">
+            <div class="applet-header-bar">
+                <span class="applet-title">マイクコントロール</span>
+            </div>
+            <div class="mic-alert-box" id="mic-alert" onclick="toggleMicMute()">🎙️ MIC: 接続待機中...</div>
+            <div class="edit-overlay" data-applet-id="mic"></div>
+        </div>
+
+        <!-- 🧩 アプレット: お部屋環境監視 -->
+        <div class="dashboard-applet" id="applet-room-env">
+            <div class="applet-header-bar">
+                <span class="applet-title">🌡️ お部屋の環境管理</span>
+                <span id="env-demo-badge" style="display:none; background: #ffaa44; color: #000; font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 6px; box-shadow: 0 0 6px rgba(255,170,68,0.5);">SIMULATOR</span>
+            </div>
+            <div style="display: flex; gap: 15px; margin-top: 10px;">
+                <div style="flex: 1; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px; text-align: center; position: relative;">
+                    <div style="font-size: 11px; color: #aaa; margin-bottom: 4px;">現在の室温</div>
+                    <div style="font-size: 28px; font-weight: bold; font-family: monospace; color: #ffaa44; text-shadow: 0 0 10px rgba(255,170,68,0.3);" id="env-temp-val">--.-℃</div>
                 </div>
-                <div id="sub-ffmpeg-body" class="ffmpeg-accordion-body" style="padding: 10px; display: block; border-top: 1px solid rgba(255,170,68,0.1); background: rgba(0,0,0,0.1);">
-                    <div class="ffmpeg-file" style="font-size: 12px; margin-bottom: 6px; color: rgba(255,255,255,0.85); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ファイル: <span id="sub-ff-filename">--</span></div>
-                    <div class="stats-bar" style="height: 4px; background: rgba(255, 170, 68, 0.02); margin-bottom: 12px; border-radius: 2px; overflow: hidden;"><div class="stat-fill" id="sub-ff-progress-bar" style="width: 0%; height: 100%; background: #ffaa44; box-shadow: 0 0 6px #ffaa44; transition: width 0.4s ease;"></div></div>
-                    <div class="ffmpeg-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-size: 11px; color: rgba(255,255,255,0.65);"><div>進捗: <span id="sub-ff-time" style="color: #fff; font-weight: 500;">--:--:--</span></div><div>速度: <span id="sub-ff-speed" style="color: #fff; font-weight: 500;">--x</span></div><div>ビットレート: <span id="sub-ff-bitrate" style="color: #fff; font-weight: 500;">--</span></div><div>経過: <span id="sub-ff-elapsed" style="color: #fff; font-weight: 500;">--:--:--</span></div></div>
+                <div style="flex: 1; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px; text-align: center; position: relative;">
+                    <div style="font-size: 11px; color: #aaa; margin-bottom: 4px;">現在の湿度</div>
+                    <div style="font-size: 28px; font-weight: bold; font-family: monospace; color: #00ddff; text-shadow: 0 0 10px rgba(0,221,255,0.3);" id="env-humidity-val">--.-%</div>
                 </div>
             </div>
+            <div id="env-status-msg" style="font-size: 10px; color: rgba(255,255,255,0.4); text-align: center; margin-top: 10px; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 2px 5px;">環境監視スレッドの開始を待機中...</div>
+            <div class="edit-overlay" data-applet-id="room-env"></div>
         </div>
-        <div class="section-title"><span>コメント配信状況</span><div class="live-status"><span class="status-item" id="viewers-val" style="color: #ffaa44; text-shadow: 0 0 6px rgba(255,170,68,0.4);">👀 --</span><span class="status-item" id="likes-val" style="color: #ff44aa; border-color: rgba(255,68,170,0.08); text-shadow: 0 0 6px rgba(255,68,170,0.4);">👍 --</span></div></div>
-        <div class="comment-list" id="comment-list-container"><div class="comment-card"><div class="user-text">PCからの信号を待機中...</div></div></div>
+
+        <!-- 🧩 アプレット: FFmpegエンコード進捗 -->
+        <div class="dashboard-applet" id="applet-ffmpeg">
+            <div class="applet-header-bar">
+                <span class="applet-title">FFmpegエンコード進捗</span>
+            </div>
+            <!-- 💤 待機中プレースホルダー（枠だけ表示されるのを防止） -->
+            <div id="ffmpeg-idle-placeholder" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 25px 15px; border: 1px dashed rgba(255,170,68,0.15); border-radius: 8px; margin-top: 10px; background: rgba(0,0,0,0.12); text-align: center;">
+                <div style="font-size: 26px; margin-bottom: 6px;">💤</div>
+                <div style="font-size: 13px; font-weight: bold; color: rgba(255,255,255,0.7);">FFmpeg 待機中</div>
+                <div style="font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 4px;">現在稼働中のエンコード処理はありません。</div>
+            </div>
+            <div class="ffmpeg-panel" id="ffmpeg-panel" style="padding: 6px; background: rgba(0,0,0,0.15); border: 1px solid rgba(255,170,68,0.08); border-radius: 8px; margin-top: 10px; display: none;">
+                <!-- 🖥️ MAIN PC FFmpeg Accordion -->
+                <div class="ffmpeg-accordion" style="border: 1px solid rgba(255, 170, 68, 0.15); border-radius: 6px; margin-bottom: 6px; overflow: hidden; background: rgba(0,0,0,0.2);">
+                    <div class="ffmpeg-accordion-header" onclick="toggleAccordion('main-ffmpeg-body')" style="padding: 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;">
+                        <span style="font-weight: bold; font-size: 13px; color: #fff; display: flex; align-items: center; gap: 4px;">🖥️ MAIN FFmpeg  <span id="main-ff-status" style="color: #ffaa44;">待機中</span> </span>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span id="main-ff-total-pct" style="background: rgba(255,136,0,0.1); padding: 1px 6px; border-radius: 4px; color: #ffaa44; font-size: 11px; font-weight: bold; border: 1px solid rgba(255,136,0,0.2);">--%</span>
+                            <span id="main-ff-arrow" style="font-size: 10px; color: rgba(255,170,68,0.5); transition: transform 0.2s;">▼</span>
+                        </div>
+                    </div>
+                    <div id="main-ffmpeg-body" class="ffmpeg-accordion-body" style="padding: 10px; display: block; border-top: 1px solid rgba(255,170,68,0.1); background: rgba(0,0,0,0.1);">
+                        <div class="ffmpeg-file" style="font-size: 12px; margin-bottom: 6px; color: rgba(255,255,255,0.85); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ファイル: <span id="main-ff-filename">--</span></div>
+                        <div class="stats-bar" style="height: 4px; background: rgba(255, 170, 68, 0.02); margin-bottom: 12px; border-radius: 2px; overflow: hidden;"><div class="stat-fill" id="main-ff-progress-bar" style="width: 0%; height: 100%; background: #ffaa44; box-shadow: 0 0 6px #ffaa44; transition: width 0.4s ease;"></div></div>
+                        <div class="ffmpeg-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-size: 11px; color: rgba(255,255,255,0.65);"><div>進捗: <span id="main-ff-time" style="color: #fff; font-weight: 500;">--:--:--</span></div><div>速度: <span id="main-ff-speed" style="color: #fff; font-weight: 500;">--x</span></div><div>ビットレート: <span id="main-ff-bitrate" style="color: #fff; font-weight: 500;">--</span></div><div>経過: <span id="main-ff-elapsed" style="color: #fff; font-weight: 500;">--:--:--</span></div></div>
+                    </div>
+                </div>
+
+                <!-- 📡 SUB PC FFmpeg Accordion -->
+                <div class="ffmpeg-accordion" style="border: 1px solid rgba(255, 170, 68, 0.15); border-radius: 6px; overflow: hidden; background: rgba(0,0,0,0.2);">
+                    <div class="ffmpeg-accordion-header" onclick="toggleAccordion('sub-ffmpeg-body')" style="padding: 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none;">
+                        <span style="font-weight: bold; font-size: 13px; color: #fff; display: flex; align-items: center; gap: 4px;">📡 SUB FFmpeg  <span id="sub-ff-status" style="color: #ffaa44;">待機中</span> </span>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span id="sub-ff-total-pct" style="background: rgba(255,136,0,0.1); padding: 1px 6px; border-radius: 4px; color: #ffaa44; font-size: 11px; font-weight: bold; border: 1px solid rgba(255,136,0,0.2);">--%</span>
+                            <span id="sub-ff-arrow" style="font-size: 10px; color: rgba(255,170,68,0.5); transition: transform 0.2s;">▼</span>
+                        </div>
+                    </div>
+                    <div id="sub-ffmpeg-body" class="ffmpeg-accordion-body" style="padding: 10px; display: block; border-top: 1px solid rgba(255,170,68,0.1); background: rgba(0,0,0,0.1);">
+                        <div class="ffmpeg-file" style="font-size: 12px; margin-bottom: 6px; color: rgba(255,255,255,0.85); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ファイル: <span id="sub-ff-filename">--</span></div>
+                        <div class="stats-bar" style="height: 4px; background: rgba(255, 170, 68, 0.02); margin-bottom: 12px; border-radius: 2px; overflow: hidden;"><div class="stat-fill" id="sub-ff-progress-bar" style="width: 0%; height: 100%; background: #ffaa44; box-shadow: 0 0 6px #ffaa44; transition: width 0.4s ease;"></div></div>
+                        <div class="ffmpeg-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; font-size: 11px; color: rgba(255,255,255,0.65);"><div>進捗: <span id="sub-ff-time" style="color: #fff; font-weight: 500;">--:--:--</span></div><div>速度: <span id="sub-ff-speed" style="color: #fff; font-weight: 500;">--x</span></div><div>ビットレート: <span id="sub-ff-bitrate" style="color: #fff; font-weight: 500;">--</span></div><div>経過: <span id="sub-ff-elapsed" style="color: #fff; font-weight: 500;">--:--:--</span></div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="edit-overlay" data-applet-id="ffmpeg"></div>
+        </div>
+
+        <!-- 🧩 アプレット: わんコメ配信コメント -->
+        <div class="dashboard-applet" id="applet-comments">
+            <div class="applet-header-bar">
+                <span class="applet-title">わんコメ配信コメント</span>
+            </div>
+            <div class="section-title" style="border-left:none; padding-left:0; margin-bottom:8px;"><span>コメント配信状況</span><div class="live-status"><span class="status-item" id="viewers-val" style="color: #ffaa44; text-shadow: 0 0 6px rgba(255,170,68,0.4);">👀 --</span><span class="status-item" id="likes-val" style="color: #ff44aa; border-color: rgba(255,68,170,0.08); text-shadow: 0 0 6px rgba(255,68,170,0.4);">👍 --</span></div></div>
+            <div class="comment-list" id="comment-list-container"><div class="comment-card"><div class="user-text">PCからの信号を待機中...</div></div></div>
+            <div class="edit-overlay" data-applet-id="comments"></div>
+        </div>
     </div>
 
     <div id="panel-control" class="tab-panel">
-        <div class="section-title">
-            <span>OBSシーン切り替え</span>
-            <button class="yt-btn" style="width:auto; padding:3px 8px; font-size:11px;" onclick="toggleSceneManagerWindow()">⚙️ 表示管理</button>
-        </div>
-        
-        <div class="scene-mgr-box" id="scene-manager-window">
-            <div style="font-size: 11px; color: rgba(255,170,68,0.6);">チェックを外したシーンをスマホ画面からハイドします（自動記憶）：</div>
-            <div class="scene-mgr-grid" id="scene-manager-checkboxes"></div>
-        </div>
-
-        <div class="obs-grid" id="obs-scenes-container">
-            <div class="user-text" style="grid-column: span 2; text-align:center; color:rgba(255,170,68,0.4);">OBSからシーン構成をロード中...</div>
-        </div>
-
-        <div class="section-title">
-            <span>Live <span id="net-badge-control" class="net-status-badge net-online">DIRECT MODE</span></span>
-            <div style="display:flex; gap:6px;">
-                <button class="yt-btn" style="width:auto; padding:4px 8px; font-size:11px; border-color:#00ffff; color:#00ffff;" onclick="forceRenewTokenUI()">鍵更新</button>
-                <button class="yt-btn" style="width:auto; padding:4px 8px; font-size:11px;" onclick="loadYouTubeBroadcasts()">更新</button>
+        <!-- 🧩 アプレット: OBSシーン切り替え -->
+        <div class="dashboard-applet" id="applet-obs_scenes">
+            <div class="applet-header-bar">
+                <span class="applet-title">OBSシーン切り替え</span>
+                <button class="applet-btn" onclick="toggleSceneManagerWindow()">⚙️ 表示管理</button>
             </div>
+            
+            <div class="scene-mgr-box" id="scene-manager-window">
+                <div style="font-size: 11px; color: rgba(255,170,68,0.6); margin-bottom: 5px;">チェックを外したシーンをハイド（自動記憶）：</div>
+                <div class="scene-mgr-grid" id="scene-manager-checkboxes"></div>
+            </div>
+
+            <div class="obs-grid" id="obs-scenes-container" style="margin-top: 5px;">
+                <div class="user-text" style="grid-column: span 2; text-align:center; color:rgba(255,170,68,0.4);">OBSからシーン構成をロード中...</div>
+            </div>
+            <div class="edit-overlay" data-applet-id="obs_scenes"></div>
         </div>
-        <div id="yt-live-control-container">アクティブな配信枠をスキャン中...</div>
+
+        <!-- 🧩 アプレット: Live配信・チャット投稿 -->
+        <div class="dashboard-applet" id="applet-live_control">
+            <div class="applet-header-bar">
+                <span class="applet-title">Live配信・チャット投稿 <span id="net-badge-control" class="net-status-badge net-online" style="margin-left: 6px; font-size:9px;">DIRECT</span></span>
+                <div class="applet-controls">
+                    <button class="applet-btn" onclick="forceRenewTokenUI()">鍵更新</button>
+                    <button class="applet-btn" onclick="loadYouTubeBroadcasts()">更新</button>
+                </div>
+            </div>
+            <div id="yt-live-control-container">アクティブな配信枠をスキャン中...</div>
+            <div class="edit-overlay" data-applet-id="live_control"></div>
+        </div>
     </div>
 
     <div id="panel-stats" class="tab-panel">
-        <div class="section-title">
-            <span>アナリティクス <span id="net-badge-stats" class="net-status-badge net-online">DIRECT MODE</span></span>
-            <button class="yt-btn" style="width:auto; padding:4px 8px; font-size:11px; border-color:#00ffff; color:#00ffff;" onclick="forceRenewTokenUI()">鍵更新</button>
+        <!-- 🧩 アプレット: YouTubeアナリティクス -->
+        <div class="dashboard-applet" id="applet-analytics">
+            <div class="applet-header-bar">
+                <span class="applet-title">YouTubeアナリティクス <span id="net-badge-stats" class="net-status-badge net-online" style="margin-left: 6px; font-size:9px;">DIRECT</span></span>
+                <button class="applet-btn" onclick="forceRenewTokenUI()">鍵更新</button>
+            </div>
+            <div id="yt-analytics-container">YouTubeサーバーからデータを取得中...</div>
+            <div class="edit-overlay" data-applet-id="analytics"></div>
         </div>
-        <div id="yt-analytics-container">YouTubeサーバーからデータを取得中...</div>
     </div>
 
     <div id="panel-macro" class="tab-panel">
-        <div class="section-title">🎛️ カスタム拡張マクロ</div>
-        <div class="macro-grid" id="macro-grid-container">
+        <!-- 🧩 アプレット: カスタム拡張マクロ -->
+        <div class="dashboard-applet" id="applet-macros">
+            <div class="applet-header-bar">
+                <span class="applet-title">カスタム拡張マクロ</span>
+            </div>
+            <div class="macro-grid" id="macro-grid-container">
+            </div>
+            <div class="edit-overlay" data-applet-id="macros"></div>
         </div>
     </div>
 
     <div id="panel-settings" class="tab-panel">
         <div class="section-title">⚙️ システム設定</div>
+        
+        <!-- 🧩 アプレット・フォーメーション・コントローラー -->
+        <div style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255, 170, 68, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(255,170,68,0.05);">
+            <div style="font-size: 14px; font-weight: bold; color: #ffaa44; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                🧩 アプレット＆画面トランスフォーム
+            </div>
+            
+            <!-- ① プリセット選択・作成 -->
+            <div style="margin-bottom: 12px;">
+                <label style="font-size: 11px; color: rgba(255,255,255,0.5); display: block; margin-bottom: 4px;">フォーメーション・プリセット選択</label>
+                <div style="display: flex; gap: 8px;">
+                    <select id="formation-preset-select" style="flex: 1; background: #000; border: 1px solid rgba(255,170,68,0.4); color: #fff; padding: 6px; border-radius: 6px; font-size: 12px; font-weight: bold; outline: none;" onchange="switchPresetUI(this.value)">
+                        <option value="default">デフォルト</option>
+                        <option value="gaming">ゲーム配信向け</option>
+                        <option value="chatting">雑談・コメント重視</option>
+                        <option value="macros_only">マクロ専用パネル</option>
+                    </select>
+                    <button class="yt-btn" style="width: auto; padding: 6px 12px; font-size: 11px;" onclick="createNewPresetUI()">新規保存</button>
+                </div>
+            </div>
+
+            <!-- ② エディットモードON/OFFトグル -->
+            <div style="display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,170,68,0.15); border-radius: 6px; padding: 10px 12px;">
+                <div>
+                    <span style="font-size: 13px; font-weight: bold; color: #fff; display: block;">レイアウト編集モード</span>
+                    <span style="font-size: 10px; color: rgba(255,255,255,0.5);">アプレットの所属タブや並び順を変更</span>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="applet-edit-mode-toggle" onchange="toggleAppletEditMode(this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
         
         <!-- 📡 リアルタイム通信ステータス表示 -->
         <div style="background: rgba(0,0,0,0.2); border: 1px solid rgba(0, 255, 255, 0.25); border-radius: 8px; padding: 15px; margin-bottom: 15px; box-shadow: 0 0 10px rgba(0,255,255,0.05);">
@@ -656,12 +932,20 @@
     }
 
     function isLocalOrigin() {
+        const hostname = window.location.hostname;
         const storedDomain = getStoredDomain();
         const originLower = CURRENT_ORIGIN.toLowerCase();
+        
+        // プライベートIP(192.168.x.x, 10.x.x.x, 172.16.x.x-172.31.x.x)やローカル環境の救済判定を汎用化
+        const isPrivateIp = 
+            hostname.startsWith("192.168.") ||
+            hostname.startsWith("10.") ||
+            /^(172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(hostname) ||
+            hostname === "127.0.0.1" ||
+            hostname === "localhost";
+
         return (
-            originLower.includes("192.168.10.") || 
-            originLower.includes("localhost") || 
-            originLower.includes("127.0.0.1") ||
+            isPrivateIp ||
             originLower.includes("ngrok-free.dev") ||
             (storedDomain && originLower.includes(storedDomain.toLowerCase()))
         );
@@ -1001,6 +1285,9 @@
             isConnecting = false;      // 接続完了したためフラグ解除
             lastPongTime = Date.now(); // 接続開始した瞬間を最終Pong受信時刻の初期値にする
             
+            // 💡 WebSocket接続成功時（再接続時含む）に確実に画面消灯防止を再バインド
+            requestWakeLock();
+            
             // 💓 5秒おきのハートビート(Ping)を設定して、iOS/Safariのスリープやゾンビ接続化を防止
             if (wsHeartbeatInterval) clearInterval(wsHeartbeatInterval);
             wsHeartbeatInterval = setInterval(() => {
@@ -1060,6 +1347,41 @@
                 renderStats(); 
                 renderMacroDeck(activeMacros, activeUiTheme);
                 applyUiTheme(activeUiTheme);
+
+                // 🌡️ お部屋環境データのリアルタイムマッピング処理
+                if (data.environment) { updateEnvironmentUI(data.environment); } if (false && data.environment) {
+                    const env = data.environment;
+                    
+                    const tempValEl = document.getElementById('env-temp-val');
+                    const humidValEl = document.getElementById('env-humidity-val');
+                    const demoBadgeEl = document.getElementById('env-demo-badge');
+                    
+                    if (tempValEl) tempValEl.innerText = `${env.room_temp.toFixed(1)}℃`;
+                    if (humidValEl) humidValEl.innerText = `${env.room_humidity.toFixed(1)}%`;
+                    
+                    if (demoBadgeEl) {
+                        demoBadgeEl.style.display = env.demo_mode ? 'inline-block' : 'none';
+                    }
+                    
+                    const overlay = document.getElementById('env-heat-alert-overlay');
+                    if (overlay) {
+                        if (env.alert_active) {
+                            document.getElementById('alert-overlay-threshold').innerText = env.alert_temp_high.toFixed(1);
+                            document.getElementById('alert-overlay-temp').innerText = `${env.room_temp.toFixed(1)}℃`;
+                            document.getElementById('alert-overlay-humidity').innerText = `${env.room_humidity.toFixed(1)}%`;
+                            if (overlay.style.display !== 'flex') {
+                                overlay.style.display = 'flex';
+                            }
+                        } else {
+                            overlay.style.display = 'none';
+                        }
+                    }
+                }
+
+                // 🧩 アプレットレイアウトのリアルタイム更新
+                if (data.layout_config) {
+                    transformApplets(data.layout_config);
+                }
             } catch (e) {
                 console.error("WS parse error: ", e);
             }
@@ -1189,8 +1511,18 @@
 
     async function requestWakeLock() {
         try {
-            if ('wakeLock' in navigator) { wakeLock = await navigator.wakeLock.request('screen'); }
-        } catch (err) { console.log("WakeLock Error: " + err.message); }
+            if ('wakeLock' in navigator) {
+                if (!wakeLock || wakeLock.released) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log("🟢 [WakeLock] Screen Wake Lock is active!");
+                    wakeLock.addEventListener('release', () => {
+                        console.log("🔒 [WakeLock] Screen Wake Lock was released.");
+                    });
+                }
+            }
+        } catch (err) {
+            console.log("⚠️ [WakeLock] Request Error: " + err.message);
+        }
     }
     
     let noSleepInterval = null;
@@ -1198,7 +1530,11 @@
         const v = document.getElementById('no-sleep-video');
         if (v) {
             if (v.paused) {
-                v.play().catch(() => {});
+                v.play().then(() => {
+                    console.log("🎥 [NoSleep] Video started playing via interaction");
+                }).catch((err) => {
+                    console.warn("⚠️ [NoSleep] Play failed via interaction: ", err);
+                });
             }
             // iOS Safari/Edge 向け：ビデオが一時停止や休止状態にならないよう、定期的に微小再生移動やリプレイを掛ける
             if (!noSleepInterval) {
@@ -1216,8 +1552,21 @@
         }
         requestWakeLock();
     }
-    document.body.addEventListener('click', def_wakeUpPhoneShield, { once: false });
-    document.body.addEventListener('touchstart', def_wakeUpPhoneShield, { once: false });
+    // 💡 画面内のどこをタップ・クリックしても確実に発火するようにcaptureフェーズで設定
+    document.addEventListener('click', def_wakeUpPhoneShield, { once: false, capture: true });
+    document.addEventListener('touchstart', def_wakeUpPhoneShield, { once: false, capture: true });
+
+    // 💡 バックグラウンドから戻った時や画面復帰時に自動でWakeLockとビデオ再生を修復
+    document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible') {
+            console.log("🟢 [Visibility] App became active. Restoring WakeLock and video.");
+            await requestWakeLock();
+            const v = document.getElementById('no-sleep-video');
+            if (v && v.paused) {
+                v.play().catch(() => {});
+            }
+        }
+    });
 
     // 🕒 バックグラウンド（非アクティブ時）通信休止コントロール
     let dashboardInterval = null;
@@ -2022,10 +2371,8 @@
         currentPC = target; const btn = document.getElementById('pc-toggle-btn');
         if (target === 'main') {
             btn.innerText = 'MAIN';
-            document.getElementById('ffmpeg-panel').style.display = 'none';
         } else {
             btn.innerText = 'SUB';
-            document.getElementById('ffmpeg-panel').style.display = 'block';
         }
         triggerToggleLit(); renderStats();
     }
@@ -2149,6 +2496,21 @@
         }
         document.getElementById('sub-ff-total-pct').innerText = sDisplayProg;
         document.getElementById('sub-ff-progress-bar').style.width = sPctValue + '%';
+
+        // 🎬 FFmpeg 待機中プレースホルダーと進捗パネルの切り替え
+        const isMainFfActive = mStatus !== "待機中";
+        const isSubFfActive = sStatus !== "待機中";
+        const ffmpegPanelEl = document.getElementById('ffmpeg-panel');
+        const ffmpegPlaceholderEl = document.getElementById('ffmpeg-idle-placeholder');
+        if (ffmpegPanelEl && ffmpegPlaceholderEl) {
+            if (isMainFfActive || isSubFfActive) {
+                ffmpegPanelEl.style.display = 'block';
+                ffmpegPlaceholderEl.style.display = 'none';
+            } else {
+                ffmpegPanelEl.style.display = 'none';
+                ffmpegPlaceholderEl.style.display = 'flex';
+            }
+        }
 
         document.getElementById('viewers-val').innerText = '👀 ' + cachedData.viewers; document.getElementById('likes-val').innerText = '👍 ' + cachedData.likes; 
         document.getElementById('comment-list-container').innerHTML = buildCommentListHtml(cachedData.comments_json);
@@ -2296,6 +2658,52 @@
         }
     }
 
+    function updateEnvironmentUI(env) {
+        if (!env) return;
+        
+        const tempValEl = document.getElementById('env-temp-val');
+        const humidValEl = document.getElementById('env-humidity-val');
+        const demoBadgeEl = document.getElementById('env-demo-badge');
+        
+        if (tempValEl) tempValEl.innerText = `${env.room_temp.toFixed(1)}℃`;
+        if (humidValEl) humidValEl.innerText = `${env.room_humidity.toFixed(1)}%`;
+        
+        if (demoBadgeEl) {
+            demoBadgeEl.style.display = env.demo_mode ? 'inline-block' : 'none';
+        }
+
+        const statusMsgEl = document.getElementById('env-status-msg');
+        if (statusMsgEl && env.status_msg) {
+            statusMsgEl.innerText = env.status_msg;
+            if (env.status_msg.includes("🟢")) {
+                statusMsgEl.style.color = "rgba(100, 255, 100, 0.65)";
+            } else if (env.status_msg.includes("❌") || env.status_msg.includes("⚠️")) {
+                statusMsgEl.style.color = "rgba(255, 100, 100, 0.85)";
+            } else {
+                statusMsgEl.style.color = "rgba(255, 255, 255, 0.4)";
+            }
+        }
+        
+        const overlay = document.getElementById('env-heat-alert-overlay');
+        if (overlay) {
+            if (env.alert_active) {
+                const threshEl = document.getElementById('alert-overlay-threshold');
+                const tempEl = document.getElementById('alert-overlay-temp');
+                const humidEl = document.getElementById('alert-overlay-humidity');
+                
+                if (threshEl) threshEl.innerText = env.alert_temp_high.toFixed(1);
+                if (tempEl) tempEl.innerText = `${env.room_temp.toFixed(1)}℃`;
+                if (humidEl) humidEl.innerText = `${env.room_humidity.toFixed(1)}%`;
+                
+                if (overlay.style.display !== 'flex') {
+                    overlay.style.display = 'flex';
+                }
+            } else {
+                overlay.style.display = 'none';
+            }
+        }
+    }
+
     function renderMacroDeck(macros, uiTheme) {
         const mContainer = document.getElementById('macro-grid-container');
         if (!mContainer) return;
@@ -2376,6 +2784,314 @@
     });
 
 
+    // ==========================================
+    // 🧩 アプレットレイアウト＆トランスフォーム管理エンジン
+    // ==========================================
+    let currentLayout = {
+        presets: {},
+        current_preset: "default"
+    };
+    let appletEditMode = false;
+    const ALL_APPLETS = ["stats", "mic", "room-env", "ffmpeg", "comments", "obs_scenes", "live_control", "analytics", "macros"];
+    const DEFAULT_TAB_MAPPING = {
+        stats: "status",
+        mic: "status",
+        "room-env": "status",
+        ffmpeg: "status",
+        comments: "status",
+        obs_scenes: "control",
+        live_control: "control",
+        analytics: "stats",
+        macros: "macro"
+    };
+
+    let lastAppliedLayoutJson = "";
+
+    function transformApplets(layoutConfig) {
+        if (!layoutConfig) return;
+        
+        // 💡 データの毎秒同期による「ピョコピョコ鼓動」する不要な再配置処理を完全に排除
+        const layoutJson = JSON.stringify(layoutConfig);
+        if (layoutJson === lastAppliedLayoutJson && !appletEditMode) {
+            currentLayout = layoutConfig; // 参照だけ最新に維持
+            return;
+        }
+        lastAppliedLayoutJson = layoutJson;
+        currentLayout = layoutConfig;
+        
+        const selectEl = document.getElementById("formation-preset-select");
+        if (selectEl) {
+            const presets = layoutConfig.presets || {};
+            const presetNames = Object.keys(presets);
+            if (presetNames.length === 0) {
+                presetNames.push("default");
+            }
+            if (!presetNames.includes("default")) {
+                presetNames.unshift("default");
+            }
+            
+            const existingOpts = Array.from(selectEl.options).map(o => o.value);
+            const isSameOptions = JSON.stringify(presetNames) === JSON.stringify(existingOpts);
+            
+            if (!isSameOptions && document.activeElement !== selectEl) {
+                selectEl.innerHTML = "";
+                presetNames.forEach(name => {
+                    const opt = document.createElement("option");
+                    opt.value = name;
+                    let displayName = name;
+                    if (name === "default") displayName = "デフォルト";
+                    else if (name === "gaming") displayName = "ゲーム配信向け";
+                    else if (name === "chatting") displayName = "雑談・コメント重視";
+                    else if (name === "macros_only") displayName = "マクロ専用パネル";
+                    else displayName = `プリセット: ${name}`;
+                    opt.textContent = displayName;
+                    selectEl.appendChild(opt);
+                });
+            }
+            
+            const targetPreset = layoutConfig.current_preset || "default";
+            if (selectEl.value !== targetPreset && document.activeElement !== selectEl) {
+                selectEl.value = targetPreset;
+            }
+        }
+
+        const activePreset = layoutConfig.current_preset || "default";
+        const presetMapping = (layoutConfig.presets && layoutConfig.presets[activePreset]) 
+            ? layoutConfig.presets[activePreset] 
+            : DEFAULT_TAB_MAPPING;
+
+        ALL_APPLETS.forEach(appletId => {
+            const el = document.getElementById(`applet-${appletId}`);
+            if (!el) return;
+            el.classList.add("transforming");
+        });
+
+        setTimeout(() => {
+            ALL_APPLETS.forEach(appletId => {
+                const el = document.getElementById(`applet-${appletId}`);
+                if (!el) return;
+
+                const configItem = presetMapping[appletId] || { tab: DEFAULT_TAB_MAPPING[appletId], order: 100 };
+                const targetTab = typeof configItem === "string" ? configItem : (configItem.tab || DEFAULT_TAB_MAPPING[appletId]);
+                const order = (configItem && typeof configItem === "object") ? (configItem.order || 100) : 100;
+
+                let parentPanelId = `panel-${targetTab}`;
+                if (targetTab === "hide") {
+                    parentPanelId = "panel-settings";
+                }
+                const parentPanel = document.getElementById(parentPanelId);
+                
+                if (parentPanel) {
+                    if (targetTab === "hide") {
+                        el.style.display = "none";
+                    } else {
+                        el.style.display = "block";
+                        parentPanel.appendChild(el);
+                    }
+                }
+                
+                el.setAttribute("data-order", order);
+            });
+
+            ["status", "control", "stats", "macro"].forEach(tab => {
+                const panel = document.getElementById(`panel-${tab}`);
+                if (!panel) return;
+
+                const appletsInPanel = Array.from(panel.querySelectorAll(".dashboard-applet"));
+                appletsInPanel.sort((a, b) => {
+                    const oa = parseInt(a.getAttribute("data-order") || "100", 10);
+                    const ob = parseInt(b.getAttribute("data-order") || "100", 10);
+                    return oa - ob;
+                });
+
+                appletsInPanel.forEach(el => panel.appendChild(el));
+            });
+
+            setTimeout(() => {
+                ALL_APPLETS.forEach(appletId => {
+                    const el = document.getElementById(`applet-${appletId}`);
+                    if (el) el.classList.remove("transforming");
+                });
+            }, 100);
+
+        }, 300);
+    }
+
+    function toggleAppletEditMode(isActive) {
+        appletEditMode = isActive;
+        if (isActive) {
+            document.body.classList.add("edit-mode-active");
+            renderEditOverlays();
+        } else {
+            document.body.classList.remove("edit-mode-active");
+            saveCurrentLayoutToServer();
+        }
+    }
+
+    const APPLE_NAMES_JP = {
+        "stats": "📊 配信機PCリソース監視",
+        "mic": "🎙️ マイク音声メーター",
+        "room-env": "🌡️ お部屋の環境監視",
+        "ffmpeg": "🎬 FFmpegエンコード進捗",
+        "comments": "💬 YouTube同時配信チャット",
+        "obs_scenes": "🎥 OBSスタジオ・シーン制御",
+        "live_control": "⚡ ライブ配信・チャット投稿",
+        "analytics": "📈 YouTubeリアルタイム統計",
+        "macros": "🎛️ カスタム・ワンタップマクロ"
+    };
+
+    function renderEditOverlays() {
+        const activePreset = currentLayout.current_preset || "default";
+        const presetMapping = (currentLayout.presets && currentLayout.presets[activePreset]) 
+            ? currentLayout.presets[activePreset] 
+            : DEFAULT_TAB_MAPPING;
+
+        ALL_APPLETS.forEach(appletId => {
+            const el = document.getElementById(`applet-${appletId}`);
+            if (!el) return;
+
+            let overlay = el.querySelector(".edit-overlay");
+            if (!overlay) return;
+
+            const configItem = presetMapping[appletId] || { tab: DEFAULT_TAB_MAPPING[appletId], order: 100 };
+            const currentTab = typeof configItem === "string" ? configItem : (configItem.tab || DEFAULT_TAB_MAPPING[appletId]);
+            const appletDisplayName = APPLE_NAMES_JP[appletId] || appletId;
+
+            overlay.innerHTML = `
+                <div style="background: rgba(255,170,68,0.18); border-bottom: 1px solid rgba(255,170,68,0.3); width: 100%; text-align: center; padding: 5px 0; margin-bottom: 8px; font-size: 11px; font-weight: bold; color: #ffaa44; border-radius: 4px 4px 0 0;">
+                    ${appletDisplayName}
+                </div>
+                <div style="font-size: 11px; font-weight: bold; color: #fff; margin-bottom: 4px;">🧩 配置設定</div>
+                <div style="font-size: 9px; color: rgba(255,255,255,0.5); margin-bottom: 6px;">移動先タブを選択</div>
+                <select class="edit-select-tab" onchange="moveAppletTabUI('${appletId}', this.value)">
+                    <option value="status" ${currentTab === "status" ? "selected" : ""}>📊 配信監視</option>
+                    <option value="control" ${currentTab === "control" ? "selected" : ""}>🎙️ ライブ操作</option>
+                    <option value="stats" ${currentTab === "stats" ? "selected" : ""}>📈 チャンネル</option>
+                    <option value="macro" ${currentTab === "macro" ? "selected" : ""}>🎛️ マクロ</option>
+                    <option value="hide" ${currentTab === "hide" ? "selected" : ""}>🚫 非表示(ハイド)</option>
+                </select>
+                <div class="edit-btn-row" style="margin-top: 8px;">
+                    <button class="edit-order-btn" onclick="adjustAppletOrderUI('${appletId}', -1)">▲ 上へ</button>
+                    <button class="edit-order-btn" onclick="adjustAppletOrderUI('${appletId}', 1)">▼ 下へ</button>
+                </div>
+            `;
+        });
+    }
+
+    function moveAppletTabUI(appletId, targetTab) {
+        const activePreset = currentLayout.current_preset || "default";
+        if (!currentLayout.presets[activePreset]) {
+            currentLayout.presets[activePreset] = {};
+        }
+
+        const presetMapping = currentLayout.presets[activePreset];
+        let currentItem = presetMapping[appletId] || { tab: DEFAULT_TAB_MAPPING[appletId], order: 100 };
+        if (typeof currentItem === "string") {
+            currentItem = { tab: currentItem, order: 100 };
+        }
+
+        currentItem.tab = targetTab;
+        presetMapping[appletId] = currentItem;
+
+        transformApplets(currentLayout);
+        
+        setTimeout(() => {
+            renderEditOverlays();
+        }, 350);
+    }
+
+    function adjustAppletOrderUI(appletId, direction) {
+        const activePreset = currentLayout.current_preset || "default";
+        if (!currentLayout.presets[activePreset]) {
+            currentLayout.presets[activePreset] = {};
+        }
+
+        const presetMapping = currentLayout.presets[activePreset];
+        ALL_APPLETS.forEach(id => {
+            let item = presetMapping[id] || { tab: DEFAULT_TAB_MAPPING[id], order: 100 };
+            if (typeof item === "string") {
+                item = { tab: item, order: 100 };
+            }
+            if (!presetMapping[id]) {
+                presetMapping[id] = item;
+            }
+        });
+
+        let currentItem = presetMapping[appletId];
+        if (typeof currentItem === "string") {
+            currentItem = { tab: currentItem, order: 100 };
+            presetMapping[appletId] = currentItem;
+        }
+
+        currentItem.order = (currentItem.order || 100) + direction;
+        
+        transformApplets(currentLayout);
+        
+        setTimeout(() => {
+            renderEditOverlays();
+        }, 350);
+    }
+
+    function switchPresetUI(presetName) {
+        currentLayout.current_preset = presetName;
+        transformApplets(currentLayout);
+        
+        const msg = JSON.stringify({
+            action: "switch-preset",
+            preset_name: presetName
+        });
+
+        if (isWsOpen()) {
+            ws.send(msg);
+        } else {
+            secureFetch("/api/switch-preset", {
+                method: "POST",
+                body: JSON.stringify({ preset_name: presetName })
+            }).catch(err => console.error("🚫 プリセット保存HTTP失敗: ", err));
+        }
+    }
+
+    function createNewPresetUI() {
+        const name = prompt("新規フォーメーション・プリセット名を入力してください（半角英数推奨）:", "custom_" + Date.now().toString().slice(-4));
+        if (!name) return;
+
+        const cleanName = name.trim().replace(/\s+/g, "_");
+        
+        const activePreset = currentLayout.current_preset || "default";
+        const currentPresetData = currentLayout.presets[activePreset] || DEFAULT_TAB_MAPPING;
+        
+        currentLayout.presets[cleanName] = JSON.parse(JSON.stringify(currentPresetData));
+        currentLayout.current_preset = cleanName;
+
+        transformApplets(currentLayout);
+        saveCurrentLayoutToServer();
+    }
+
+    function saveCurrentLayoutToServer() {
+        const activePreset = currentLayout.current_preset || "default";
+        const presetMapping = currentLayout.presets[activePreset] || DEFAULT_TAB_MAPPING;
+
+        const msg = JSON.stringify({
+            action: "save-layout",
+            preset_name: activePreset,
+            layout: presetMapping
+        });
+
+        if (isWsOpen()) {
+            ws.send(msg);
+        } else {
+            secureFetch("/api/save-layout", {
+                method: "POST",
+                body: JSON.stringify({
+                    preset_name: activePreset,
+                    layout: presetMapping
+                })
+            }).catch(err => console.error("🚫 レイアウト保存HTTP失敗: ", err));
+        }
+    }
+
+    let successfulPolls = 0;
+
     function updateDashboard() {
         // ngrok 警告リンク of course...
         const ngrokWarningLink = document.getElementById('ngrok-btn-link');
@@ -2403,6 +3119,16 @@
             lastSuccessfulFetchTime = Date.now();
             updateConnectionStatusUI();
             
+            // 💡 ネットワーク復帰によるWebSocketへの自動昇格(Upgrade)
+            successfulPolls++;
+            const compatToggle = document.getElementById('safari-compat-mode') || document.getElementById('ios-compat-toggle');
+            const compatMode = compatToggle ? compatToggle.checked : false;
+            if (successfulPolls >= 3 && !compatMode && (!ws || ws.readyState !== WebSocket.OPEN)) {
+                console.log("⚡ HTTPポーリング接続安定を確認 (3連続成功)。WebSocketへの自動復帰を試みます。");
+                successfulPolls = 0;
+                connectWebSocket();
+            }
+            
             // ポーリングによるデータ更新の際、コンソールで編集中の一時同期データがあればそちらを優先（巻き戻り防止）
             let activeTabs = data.tabs;
             let activeMacros = data.macros;
@@ -2418,9 +3144,20 @@
             renderStats(); 
             renderMacroDeck(activeMacros, activeUiTheme);
             applyUiTheme(activeUiTheme);
+
+            // 🌡️ お部屋環境データのマッピング
+            if (data.environment) {
+                updateEnvironmentUI(data.environment);
+            }
+
+            // 🧩 アプレットレイアウトのリアルタイム更新
+            if (data.layout_config) {
+                transformApplets(data.layout_config);
+            }
         })
         .catch(err => {
             console.error("Dashboard polling error:", err);
+            successfulPolls = 0;
             // エラー時も共通ステータス更新関数を使って、正しく判定
             updateConnectionStatusUI();
         });
@@ -2452,6 +3189,34 @@
     }
     
     setInterval(forceRenewTokenSilent, 1800000);
+    
+    // 📱 iOS Safari用: スリープ復帰(バックグラウンドからアクティブへの切り替え)検知時のWebSocket強制再接続回路
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+            console.log("📱 スリープ復帰(visibilitychange: visible)を検出しました。WebSocketの接続状態を確認します。");
+            const compatToggle = document.getElementById('safari-compat-mode') || document.getElementById('ios-compat-toggle');
+            const compatMode = compatToggle ? compatToggle.checked : false;
+            
+            if (!compatMode && (!ws || ws.readyState !== WebSocket.OPEN)) {
+                console.log("🔌 WebSocketが切断されているため、強制再接続を開始します。");
+                connectWebSocket();
+            }
+            updateDashboard(); // データも即時更新
+        }
+    });
+
+    window.addEventListener("pageshow", (event) => {
+        // bfcache (往復キャッシュ) からの復帰も網羅
+        console.log("📱 ページ表示(pageshow)を検出しました。bfcache復帰:", event.persisted);
+        const compatToggle = document.getElementById('safari-compat-mode') || document.getElementById('ios-compat-toggle');
+        const compatMode = compatToggle ? compatToggle.checked : false;
+        
+        if (!compatMode && (!ws || ws.readyState !== WebSocket.OPEN)) {
+            console.log("🔌 WebSocketの強制再接続を開始します。");
+            connectWebSocket();
+        }
+        updateDashboard();
+    });
     </script>
 </body>
 </html>
